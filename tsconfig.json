@@ -6,6 +6,10 @@
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
+    "paths": {
+      "engine": ["./dist/engine"],
+      "lib-acquire": ["./dist/lib-acquire"]
+    },
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "isolatedModules": true,
@@ -19,5 +23,19 @@
     "strictInjectionParameters": true,
     "strictInputAccessModifiers": true
   },
-  "files": []
+  "files": [],
+  "references": [
+    {
+      "path": "./lib/acquire/tsconfig.lib.json"
+    },
+    {
+      "path": "./lib/acquire/tsconfig.spec.json"
+    },
+    {
+      "path": "./projects/engine/tsconfig.lib.json"
+    },
+    {
+      "path": "./projects/engine/tsconfig.spec.json"
+    }
+  ]
 }
