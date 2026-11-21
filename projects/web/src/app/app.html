@@ -1,0 +1,17 @@
+<header class="topbar">
+  <a class="brand" routerLink="/">Acquire</a>
+  <nav>
+    <a
+      routerLink="/"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      >Play</a
+    >
+    <a routerLink="/scoreboard" routerLinkActive="active"
+      >Scoreboard</a
+    >
+  </nav>
+</header>
+<main>
+  <router-outlet />
+</main>

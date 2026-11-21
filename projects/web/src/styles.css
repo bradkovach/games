@@ -1,0 +1,151 @@
+:root {
+  --ink: #1e293b;
+  --muted: #64748b;
+  --line: #cbd5e1;
+  --panel: #f8fafc;
+  --accent: #2563eb;
+  --danger: #b91c1c;
+  --sackson: #e4572e;
+  --tower: #f2c14e;
+  --american: #1d4e89;
+  --festival: #3bb273;
+  --worldwide: #8e6c8a;
+  --continental: #17becf;
+  --imperial: #d6336c;
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+body {
+  background: #eef2f7;
+  margin: 0;
+}
+h1,
+h2,
+h3 {
+  margin: 0.4rem 0;
+}
+.panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+}
+.row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.grid-2 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+}
+@media (max-width: 800px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+}
+button.secondary {
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+input,
+select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+}
+input[type='number'] {
+  width: 4.5rem;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th,
+td {
+  /* border-bottom: 1px solid var(--line); */
+  padding: 0.3rem 0.4rem;
+  text-align: left;
+}
+tbody tr + tr th,
+tbody tr + tr td {
+  border-top: 1px solid var(--line);
+}
+/* last row of the thead */
+thead tr:last-child th,
+thead tr:last-child td {
+  border-bottom: 2px solid var(--line);
+}
+td.num,
+th.num {
+  text-align: right;
+}
+.muted {
+  color: var(--muted);
+}
+.error {
+  color: var(--danger);
+}
+.chip {
+  border-radius: 4px;
+  color: white;
+  display: inline-block;
+  font-size: 0.85em;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 40%);
+}
+.chain-sackson {
+  background: var(--sackson);
+}
+.chain-tower {
+  background: var(--tower);
+}
+.chain-american {
+  background: var(--american);
+}
+.chain-festival {
+  background: var(--festival);
+}
+.chain-worldwide {
+  background: var(--worldwide);
+}
+.chain-continental {
+  background: var(--continental);
+}
+.chain-imperial {
+  background: var(--imperial);
+}
+
+.visually-hidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}

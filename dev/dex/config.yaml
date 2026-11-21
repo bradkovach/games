@@ -1,0 +1,30 @@
+# Development-only Dex configuration. Replace the password
+# connector with real connectors (GitHub, Google, LDAP, ...) in
+# production: https://dexidp.io/docs/connectors/
+issuer: http://localhost:5556/dex
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+oauth2:
+  skipApprovalScreen: true
+
+staticClients:
+  - id: acquire
+    name: Acquire
+    secret: acquire-dev-secret
+    redirectURIs:
+      - http://localhost:4200/auth/callback
+      - http://localhost:4000/auth/callback
+
+enablePasswordDB: true
+
+staticPasswords:
+  # Password: "password"
+  - email: host@example.com
+    hash: '$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W'
+    username: host
+    userID: 08a8684b-db88-4b73-90a9-3cd1661f5466

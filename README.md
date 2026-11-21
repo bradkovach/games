@@ -1,59 +1,71 @@
 # Acquire
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.3.
+A digital version of the Acquire board game, plus a scoreboard
+for scoring in-person games.
 
-## Development server
+- `projects/engine` is a pure TypeScript rules engine. Commands
+  are validated with Zod. `decide()` turns a command into events,
+  and `apply()`/`replay()` reduce those events into game state.
+  Random tile draws are recorded in the events, so a game log
+  replays exactly. `playerView`, `publicView` and `redactEvent`
+  build each viewer's projection, which hides cash and stock
+  when the game uses secret holdings.
+- `projects/web` is an Angular SSR app served by Fastify, with
+  WebSockets at `/ws/:id`, OIDC sign-in through Dex, and SQLite
+  storage via better-sqlite3.
 
-To start a local development server, run:
+## Routes
 
-```bash
-ng serve
-```
+| Route             | Purpose                                         |
+| ----------------- | ----------------------------------------------- |
+| `/`               | Host a game (requires sign-in) or join with PIN |
+| `/join?t=…`       | Join via QR invite link or PIN                  |
+| `/game/:id`       | Player view (board + private hand and holdings) |
+| `/game/:id/board` | Public board for a shared screen/spectators     |
+| `/scoreboard`     | Offline final-score tally and price lookup      |
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Development
 
 ```bash
-ng build
+npm install
+npm run dex     # Dex OIDC on http://localhost:5556 (docker compose)
+npm start       # ng serve on :4200; game WebSockets on :4001
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Sign in with the static Dex user `host@example.com` / `password`
+(configured in `dev/dex/config.yaml`). To use real identity
+providers, add Dex connectors (GitHub, Google, etc.) there.
 
-## Running unit tests
+Players don't need accounts. The host opens the lobby, clicks
+**Invite players** and shares the QR code or the 9-digit PIN.
+Invites expire after 15 minutes.
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## Configuration
+
+| Variable             | Default                     |
+| -------------------- | --------------------------- |
+| `PORT`               | `4000`                      |
+| `HOST`               | `0.0.0.0`                   |
+| `DATA_DIR`           | `data` (SQLite database)    |
+| `PUBLIC_URL`         | `http://localhost:4200`     |
+| `ALLOWED_HOSTS`      | extra SSR hosts, comma-sep. |
+| `SESSION_SECRET`     | random per start (set it!)  |
+| `OIDC_ISSUER`        | `http://localhost:5556/dex` |
+| `OIDC_CLIENT_ID`     | `acquire`                   |
+| `OIDC_CLIENT_SECRET` | `acquire-dev-secret`        |
+
+## Production
 
 ```bash
-ng test
+npm run build
+SESSION_SECRET=… PUBLIC_URL=https://… npm run serve:ssr:web
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+## Quality
 
 ```bash
-ng e2e
+npm run lint
+npm run format:check
+npx ng test engine --watch=false
+npx ng test web --watch=false
 ```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
