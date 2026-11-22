@@ -116,44 +116,18 @@ export function publicView(state: GameState): PublicView {
 
 /**
  * Strips hidden information from an event before it is sent to
- * `viewerId` (`null` for spectators). Tile draws are always
- * private; share and cash amounts are private in secret mode.
- * Stockholder bonus payouts stay public.
+ * `viewerId` (`null` for spectators). Only tile draws are private;
+ * transactions happen in the open even when holdings are secret,
+ * because secrecy covers running totals, not individual trades.
  */
 export function redactEvent(
   event: GameEvent,
   viewerId: null | string,
-  settings: GameSettings,
 ): GameEvent {
-  switch (event.type) {
-    case 'stockDisposed':
-      if (
-        !settings.secretHoldings ||
-        event.playerId === viewerId
-      ) {
-        return event;
-      }
-      return {
-        type: event.type,
-        chain: event.chain,
-        playerId: event.playerId,
-        survivor: event.survivor,
-      };
-    case 'stockPurchased':
-      if (
-        !settings.secretHoldings ||
-        event.playerId === viewerId
-      ) {
-        return event;
-      }
-      return { type: event.type, playerId: event.playerId };
-    case 'tileDrawn':
-      return event.playerId === viewerId
-        ? event
-        : { type: event.type, playerId: event.playerId };
-    default:
-      return event;
-  }
+  return event.type === 'tileDrawn' &&
+    event.playerId !== viewerId
+    ? { type: event.type, playerId: event.playerId }
+    : event;
 }
 
 function holdingsHidden(state: GameState): boolean {

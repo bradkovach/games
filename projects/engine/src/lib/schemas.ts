@@ -116,7 +116,8 @@ export type GameResults = z.infer<typeof GameResultsSchema>;
 
 /**
  * Facts appended to the game log. Replaying them through `apply`
- * rebuilds state. Optional fields are stripped by `redactEvent`.
+ * rebuilds state. `redactEvent` strips a drawn tile from other
+ * viewers; other optional fields keep older logs parseable.
  */
 export const GameEventSchema = z.discriminatedUnion('type', [
   z.object({

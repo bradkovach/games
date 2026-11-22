@@ -108,6 +108,11 @@ describe('GameHub', () => {
     const guestView = guest.lastView() as PlayerView;
     expect(ownerView.me.hand).toHaveLength(6);
     expect(guestView.me.id).toBe(b.playerId);
+    expect(
+      guestView.players.every(
+        (p) => p.cash === undefined && p.stock === undefined,
+      ),
+    ).toBe(true);
 
     const ownerTiles = ownerView.me.hand.map((t) => t.tile);
     const leaked = (l: ReturnType<typeof listener>) =>

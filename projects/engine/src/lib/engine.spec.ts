@@ -360,33 +360,33 @@ describe('secrecy', () => {
     );
   });
 
-  it('redacts draws and trades for other viewers', () => {
-    const { settings } = state;
+  it('redacts draws but keeps transactions public', () => {
     const draw: GameEvent = {
       type: 'tileDrawn',
       playerId: 'a',
       tile: '9I',
     };
-    expect(redactEvent(draw, 'b', settings)).toEqual({
+    expect(redactEvent(draw, 'b')).toEqual({
       type: 'tileDrawn',
       playerId: 'a',
     });
-    expect(redactEvent(draw, 'a', settings)).toBe(draw);
+    expect(redactEvent(draw, 'a')).toBe(draw);
     const buy: GameEvent = {
       type: 'stockPurchased',
       cost: 600,
       playerId: 'a',
       purchases: { tower: 3 },
     };
-    expect(redactEvent(buy, null, settings)).toEqual({
-      type: 'stockPurchased',
+    expect(redactEvent(buy, null)).toBe(buy);
+    const disposal: GameEvent = {
+      type: 'stockDisposed',
+      cash: 400,
+      chain: 'tower',
       playerId: 'a',
-    });
-    expect(
-      redactEvent(buy, null, {
-        ...settings,
-        secretHoldings: false,
-      }),
-    ).toBe(buy);
+      sell: 2,
+      survivor: 'american',
+      trade: 2,
+    };
+    expect(redactEvent(disposal, 'b')).toBe(disposal);
   });
 });

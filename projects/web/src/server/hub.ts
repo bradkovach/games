@@ -318,12 +318,9 @@ export class GameHub {
   ): void {
     const { game } = room;
     const { playerId } = connection;
-    const settings = game.state.settings;
     connection.send({
       type: 'state',
-      events: events.map((e) =>
-        redactEvent(e, playerId, settings),
-      ),
+      events: events.map((e) => redactEvent(e, playerId)),
       seq: game.events.length,
       view: playerId
         ? game.playerView(playerId)
