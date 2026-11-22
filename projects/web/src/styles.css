@@ -1,17 +1,39 @@
 :root {
-  --ink: #1e293b;
-  --muted: #64748b;
-  --line: #cbd5e1;
-  --panel: #f8fafc;
-  --accent: #2563eb;
-  --danger: #b91c1c;
-  --sackson: #e4572e;
-  --tower: #f2c14e;
-  --american: #1d4e89;
-  --festival: #3bb273;
-  --worldwide: #8e6c8a;
-  --continental: #17becf;
-  --imperial: #d6336c;
+  color-scheme: light dark;
+  /* Dark values follow Dark Reader's default palette. */
+  --bg: light-dark(#eef2f7, #181a1b);
+  --surface: light-dark(#ffffff, #1f2223);
+  --ink: light-dark(#1e293b, #e8e6e3);
+  --muted: light-dark(#64748b, #9d968b);
+  --line: light-dark(#cbd5e1, #3a3e41);
+  --accent: light-dark(#2563eb, #1f58c4);
+  --on-accent: #ffffff;
+  --danger: light-dark(#b91c1c, #f26d6d);
+  --neutral: light-dark(#e2e8f0, #2b2f31);
+  --neutral-hover: light-dark(#f1f5f9, #353a3c);
+  --topbar: light-dark(#1e293b, #111314);
+  --topbar-ink: #e8e6e3;
+  --topbar-muted: #a8b3c2;
+  --cell-empty: light-dark(#e2e8f0, #26292b);
+  --cell-empty-ink: light-dark(#94a3b8, #5f676c);
+  --cell-placed: light-dark(#64748b, #5b6670);
+  --highlight: #facc15;
+  /* Medal text colours, readable on the panel surface. */
+  --gold: light-dark(#a87700, #f0c43c);
+  --silver: light-dark(#6b7785, #cfd8df);
+  --bronze: light-dark(#9a5426, #e0915a);
+  --up: light-dark(#15803d, #4ade80);
+  --down: light-dark(#b91c1c, #f87171);
+  /* Text on chain colours; tower and continental are light. */
+  --on-chain: #ffffff;
+  --on-light-chain: #1e293b;
+  --sackson: light-dark(#e4572e, #c44a26);
+  --tower: light-dark(#f2c14e, #d9a93a);
+  --american: light-dark(#1d4e89, #2a5f9e);
+  --festival: light-dark(#3bb273, #2f9660);
+  --worldwide: light-dark(#8e6c8a, #7d5e79);
+  --continental: light-dark(#17becf, #14a3b2);
+  --imperial: light-dark(#d6336c, #b82c5d);
   color: var(--ink);
   font-family:
     system-ui,
@@ -19,8 +41,14 @@
     'Segoe UI',
     sans-serif;
 }
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
 body {
-  background: #eef2f7;
+  background: var(--bg);
   margin: 0;
 }
 h1,
@@ -29,11 +57,43 @@ h3 {
   margin: 0.4rem 0;
 }
 .panel {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
+}
+/* Shimmering border on the panel that needs the player's input. */
+@property --shimmer-angle {
+  inherits: false;
+  initial-value: 0deg;
+  syntax: '<angle>';
+}
+.panel.attention {
+  animation: shimmer 3s linear infinite;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(
+        from var(--shimmer-angle),
+        var(--accent),
+        var(--highlight) 15%,
+        var(--accent) 30%,
+        var(--line) 50%,
+        var(--accent)
+      )
+      border-box;
+  border: 2px solid transparent;
+  padding: calc(0.75rem - 1px) calc(1rem - 1px);
+}
+@keyframes shimmer {
+  to {
+    --shimmer-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel.attention {
+    animation: none;
+  }
 }
 .row {
   align-items: center;
@@ -55,13 +115,13 @@ button {
   background: var(--accent);
   border: 0;
   border-radius: 6px;
-  color: white;
+  color: var(--on-accent);
   cursor: pointer;
   font: inherit;
   padding: 0.4rem 0.8rem;
 }
 button.secondary {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--line);
   color: var(--ink);
 }
@@ -71,7 +131,9 @@ button:disabled {
 }
 input,
 select {
+  background: var(--surface);
   border: 1px solid var(--line);
+  color: var(--ink);
   border-radius: 6px;
   font: inherit;
   padding: 0.3rem 0.5rem;
@@ -102,6 +164,10 @@ td.num,
 th.num {
   text-align: right;
 }
+td.figure,
+th.figure {
+  text-align: center;
+}
 .muted {
   color: var(--muted);
 }
@@ -110,7 +176,7 @@ th.num {
 }
 .chip {
   border-radius: 4px;
-  color: white;
+  color: var(--on-chain);
   display: inline-block;
   font-size: 0.85em;
   font-weight: 600;
@@ -122,6 +188,8 @@ th.num {
 }
 .chain-tower {
   background: var(--tower);
+  color: var(--on-light-chain);
+  text-shadow: none;
 }
 .chain-american {
   background: var(--american);
@@ -134,6 +202,18 @@ th.num {
 }
 .chain-continental {
   background: var(--continental);
+  color: var(--on-light-chain);
+  text-shadow: none;
+}
+/* Header cells that show a chain name on its colour. */
+th.chain {
+  color: var(--on-chain);
+  text-shadow: 0 1px 1px rgb(0 0 0 / 40%);
+}
+th.chain.chain-tower,
+th.chain.chain-continental {
+  color: var(--on-light-chain);
+  text-shadow: none;
 }
 .chain-imperial {
   background: var(--imperial);
@@ -148,4 +228,42 @@ th.num {
   padding: 0;
   position: absolute;
   width: 1px;
+}
+
+.emoji {
+  font-family:
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji',
+    'Noto Emoji', sans-serif;
+  font-variant-emoji: emoji;
+}
+/* Shrink-wraps a table's chain column so data columns get the space. */
+th.chain.narrow {
+  white-space: nowrap;
+  width: 1%;
+}
+/* Monochrome symbols that inherit the text colour, e.g. 🔒. */
+.glyph-text {
+  /* font-family: 'Noto Emoji', sans-serif; */
+  font-variant-emoji: text;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.py-1 {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
 }

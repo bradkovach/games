@@ -66,7 +66,7 @@ export function rankPlayers(
   finalCash: Record<string, number>,
 ): { cash: number; id: string; place: number }[] {
   const sorted = Object.entries(finalCash)
-    .map(([id, cash]) => ({ cash, id }))
+    .map(([id, cash]) => ({ id, cash }))
     .sort((a, b) => b.cash - a.cash);
   return sorted.map((entry) => ({
     ...entry,

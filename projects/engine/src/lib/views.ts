@@ -69,12 +69,12 @@ export function playerView(
   return {
     ...view,
     me: {
+      id: playerId,
       cash: state.cash[playerId] ?? 0,
       hand: (state.hands[playerId] ?? []).map((tile) => ({
         status: tileStatus(state, tile),
         tile,
       })),
-      id: playerId,
       stock: { ...state.stock[playerId] },
     },
   };
@@ -99,8 +99,8 @@ export function publicView(state: GameState): PublicView {
     endDeclared: state.endDeclared,
     phase: state.phase,
     players: state.players.map(({ id, name }) => ({
-      handCount: state.hands[id]?.length ?? 0,
       id,
+      handCount: state.hands[id]?.length ?? 0,
       name,
       ...(hidden
         ? {}
@@ -134,10 +134,10 @@ export function redactEvent(
         return event;
       }
       return {
+        type: event.type,
         chain: event.chain,
         playerId: event.playerId,
         survivor: event.survivor,
-        type: event.type,
       };
     case 'stockPurchased':
       if (
@@ -146,11 +146,11 @@ export function redactEvent(
       ) {
         return event;
       }
-      return { playerId: event.playerId, type: event.type };
+      return { type: event.type, playerId: event.playerId };
     case 'tileDrawn':
       return event.playerId === viewerId
         ? event
-        : { playerId: event.playerId, type: event.type };
+        : { type: event.type, playerId: event.playerId };
     default:
       return event;
   }

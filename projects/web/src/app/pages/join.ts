@@ -2,15 +2,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   inject,
+  type OnInit,
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
+import { AvatarPickerComponent } from '../components/avatar-picker';
 import { Api } from '../services/api';
 import { saveSeat } from '../services/seats';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [AvatarPickerComponent],
   selector: 'app-join',
   template: `
     <section class="panel" style="max-width: 28rem">
@@ -27,6 +30,7 @@ import { saveSeat } from '../services/seats';
                 placeholder="123-456-789"
                 [value]="pin()"
                 (input)="pin.set($any($event.target).value)"
+                (change)="loadTaken()"
               />
             </label>
           </p>
@@ -44,6 +48,15 @@ import { saveSeat } from '../services/seats';
             />
           </label>
         </p>
+        <p>Your mascot</p>
+        <app-avatar-picker
+          [(value)]="avatar"
+          [taken]="taken()"
+        />
+        <p class="muted">
+          Leave it blank to get one assigned; you can change it
+          in the lobby.
+        </p>
         <button
           type="submit"
           [disabled]="busy() || !name().trim()"
@@ -57,11 +70,13 @@ import { saveSeat } from '../services/seats';
     </section>
   `,
 })
-export class JoinPage {
+export class JoinPage implements OnInit {
+  protected readonly avatar = signal<null | string>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<null | string>(null);
   protected readonly name = signal('');
   protected readonly pin = signal('');
+  protected readonly taken = signal<string[]>([]);
   protected readonly token =
     inject(ActivatedRoute).snapshot.queryParamMap.get('t');
   private readonly api = inject(Api);
@@ -75,13 +90,33 @@ export class JoinPage {
       const grant = await this.api.join(
         this.token ?? this.pin(),
         this.name(),
+        this.avatar() ?? undefined,
       );
       saveSeat(grant);
       await this.router.navigate(['/game', grant.gameId]);
     } catch (error) {
       this.error.set((error as Error).message);
+      void this.loadTaken();
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Greys out mascots other players already picked. */
+  async loadTaken(): Promise<void> {
+    const code = this.token ?? this.pin();
+    if (!code.trim()) return;
+    try {
+      const { taken } = await this.api.avatarsTaken(code);
+      this.taken.set(taken);
+      if (taken.includes(this.avatar() ?? ''))
+        this.avatar.set(null);
+    } catch {
+      this.taken.set([]);
+    }
+  }
+
+  ngOnInit(): void {
+    if (this.token) void this.loadTaken();
   }
 }

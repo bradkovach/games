@@ -1,13 +1,13 @@
 .topbar {
   align-items: center;
-  background: var(--ink);
-  color: white;
+  background: var(--topbar);
+  color: var(--topbar-ink);
   display: flex;
   gap: 1.5rem;
   padding: 0.6rem 1rem;
 }
 .brand {
-  color: white;
+  color: var(--topbar-ink);
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -18,15 +18,27 @@ nav {
   gap: 1rem;
 }
 nav a {
-  color: #cbd5e1;
+  color: var(--topbar-muted);
   text-decoration: none;
 }
 nav a.active {
-  color: white;
+  color: var(--topbar-ink);
   text-decoration: underline;
 }
 main {
   margin: 0 auto;
   max-width: 1200px;
   padding: 1rem;
+}
+.theme {
+  margin-left: auto;
+}
+.theme select {
+  background: transparent;
+  border-color: var(--topbar-muted);
+  color: var(--topbar-ink);
+}
+.theme option {
+  background: var(--surface);
+  color: var(--ink);
 }

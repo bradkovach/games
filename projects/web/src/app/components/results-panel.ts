@@ -11,6 +11,8 @@ import {
   rankPlayers,
 } from 'engine';
 
+import { formatTicker } from './ticker';
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-results-panel',
@@ -20,9 +22,10 @@ import {
         <tr>
           <th>#</th>
           <th>Player</th>
-          <th class="num">Bonuses</th>
-          <th class="num">Stock sales</th>
-          <th class="num">Final</th>
+          <th class="num">Cash</th>
+          <th class="num">+ Bonuses</th>
+          <th class="num">+ Stock sales</th>
+          <th class="num">= Net worth</th>
         </tr>
       </thead>
       <tbody>
@@ -30,9 +33,10 @@ import {
           <tr [style.font-weight]="row.place === 1 ? 700 : 400">
             <td>{{ row.place === 1 ? '🏆' : row.place }}</td>
             <td>{{ name()(row.id) }}</td>
-            <td class="num">\${{ row.bonuses }}</td>
-            <td class="num">\${{ row.sales }}</td>
-            <td class="num">\${{ row.cash }}</td>
+            <td class="num">{{ money(row.startCash) }}</td>
+            <td class="num">{{ money(row.bonuses) }}</td>
+            <td class="num">{{ money(row.sales) }}</td>
+            <td class="num">{{ money(row.cash) }}</td>
           </tr>
         }
       </tbody>
@@ -51,13 +55,19 @@ export class ResultsPanelComponent {
   readonly name = input<(id: string) => string>((id) => id);
   readonly results = input.required<GameResults>();
 
+  protected readonly money = (value: number) =>
+    formatTicker(value, 'currency');
+
   protected readonly bonusLines = computed(() =>
     Object.entries(this.results().bonuses).map(
       ([chain, payouts]) => ({
         chain,
         label: CHAIN_NAMES[chain as ChainId],
         text: Object.entries(payouts ?? {})
-          .map(([id, amount]) => `${this.name()(id)} $${amount}`)
+          .map(
+            ([id, amount]) =>
+              `${this.name()(id)} ${this.money(amount ?? 0)}`,
+          )
           .join(', '),
       }),
     ),
@@ -65,13 +75,18 @@ export class ResultsPanelComponent {
 
   protected readonly rows = computed(() => {
     const results = this.results();
-    return rankPlayers(results.finalCash).map((row) => ({
-      ...row,
-      bonuses: Object.values(results.bonuses).reduce(
+    return rankPlayers(results.finalCash).map((row) => {
+      const bonuses = Object.values(results.bonuses).reduce(
         (sum, payouts) => sum + (payouts?.[row.id] ?? 0),
         0,
-      ),
-      sales: results.sales[row.id] ?? 0,
-    }));
+      );
+      const sales = results.sales[row.id] ?? 0;
+      return {
+        ...row,
+        bonuses,
+        sales,
+        startCash: row.cash - bonuses - sales,
+      };
+    });
   });
 }

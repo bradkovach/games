@@ -8,7 +8,14 @@ import type {
 
 @Injectable({ providedIn: 'root' })
 export class Api {
+  avatarsTaken(code: string): Promise<{ taken: string[] }> {
+    return request(
+      `/api/join/avatars?code=${encodeURIComponent(code)}`,
+    );
+  }
+
   createGame(settings: {
+    avatar?: string;
     mode: 'classic' | 'tycoon';
     secretHoldings: boolean;
   }): Promise<SeatGrant> {
@@ -27,9 +34,13 @@ export class Api {
     );
   }
 
-  join(code: string, name: string): Promise<SeatGrant> {
+  join(
+    code: string,
+    name: string,
+    avatar?: string,
+  ): Promise<SeatGrant> {
     return request('/api/join', {
-      body: JSON.stringify({ code, name }),
+      body: JSON.stringify({ avatar, code, name }),
       method: 'POST',
     });
   }

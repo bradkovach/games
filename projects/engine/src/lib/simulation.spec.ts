@@ -25,16 +25,16 @@ function chooseCommand(game: Game, random: () => number) {
       const chain = pick(activeChains(state), random);
       const count = Math.floor(random() * 4);
       command = {
-        purchases: chain ? { [chain]: count } : {},
         type: 'endTurn',
+        purchases: chain ? { [chain]: count } : {},
       };
       break;
     }
     case 'chooseAcquired':
     case 'chooseSurvivor':
       command = {
-        chain: pick(phase.candidates, random),
         type: phase.kind,
+        chain: pick(phase.candidates, random),
       };
       break;
     case 'disposeStock': {
@@ -44,13 +44,13 @@ function chooseCommand(game: Game, random: () => number) {
         state.bank[phase.survivor] * 2,
       );
       const sell = Math.floor((owned - trade) * random());
-      command = { sell, trade, type: 'disposeStock' };
+      command = { type: 'disposeStock', sell, trade };
       break;
     }
     case 'foundChain':
       command = {
-        chain: pick(availableChains(state), random),
         type: 'foundChain',
+        chain: pick(availableChains(state), random),
       };
       break;
     case 'placeTile': {
@@ -60,8 +60,8 @@ function chooseCommand(game: Game, random: () => number) {
       command =
         playable.length > 0
           ? {
-              tile: pick(playable, random).tile,
               type: 'placeTile',
+              tile: pick(playable, random).tile,
             }
           : { type: 'passPlacement' };
       break;

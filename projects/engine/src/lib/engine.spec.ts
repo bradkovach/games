@@ -51,12 +51,12 @@ function makeState(options: {
   secret?: boolean;
 }): GameState {
   const state = apply(initialState(), {
+    type: 'gameStarted',
     players: PLAYERS,
     settings: {
       mode: 'classic',
       secretHoldings: options.secret ?? false,
     },
-    type: 'gameStarted',
   });
   return {
     ...state,
@@ -106,7 +106,7 @@ describe('startGame', () => {
     if (first.kind !== 'placeTile') throw new Error('bad phase');
     const hand = game.playerView(first.playerId).me.hand;
     const tile = hand.find((t) => t.status === 'playable')!.tile;
-    game.dispatch(first.playerId, { tile, type: 'placeTile' });
+    game.dispatch(first.playerId, { type: 'placeTile', tile });
     expect(new Game(game.events).state).toEqual(game.state);
   });
 });
@@ -115,16 +115,16 @@ describe('placing tiles', () => {
   it('rejects bad tiles and out-of-turn play', () => {
     const state = makeState({ hands: { a: ['1A'], b: ['2A'] } });
     expect(
-      attempt(state, 'a', { tile: '3C', type: 'placeTile' }),
+      attempt(state, 'a', { type: 'placeTile', tile: '3C' }),
     ).toEqual({
       error: 'That tile is not in your hand',
       ok: false,
     });
     expect(
-      attempt(state, 'b', { tile: '2A', type: 'placeTile' }),
+      attempt(state, 'b', { type: 'placeTile', tile: '2A' }),
     ).toEqual({ error: 'It is not your turn', ok: false });
     expect(
-      attempt(state, 'a', { tile: 'ZZ', type: 'placeTile' }),
+      attempt(state, 'a', { type: 'placeTile', tile: 'ZZ' }),
     ).toEqual({ error: 'Invalid tile id', ok: false });
   });
 
@@ -133,11 +133,11 @@ describe('placing tiles', () => {
       board: { '1A': null, '1B': null },
       hands: { a: ['2A'] },
     });
-    state = run(state, 'a', { tile: '2A', type: 'placeTile' });
+    state = run(state, 'a', { type: 'placeTile', tile: '2A' });
     expect(state.phase.kind).toBe('foundChain');
     state = run(state, 'a', {
-      chain: 'tower',
       type: 'foundChain',
+      chain: 'tower',
     });
     expect(chainSize(state, 'tower')).toBe(3);
     expect(state.stock['a'].tower).toBe(1);
@@ -158,7 +158,7 @@ describe('placing tiles', () => {
       },
       hands: { a: ['3A'] },
     });
-    state = run(state, 'a', { tile: '3A', type: 'placeTile' });
+    state = run(state, 'a', { type: 'placeTile', tile: '3A' });
     expect(chainSize(state, 'tower')).toBe(5);
   });
 
@@ -182,7 +182,7 @@ describe('placing tiles', () => {
       { status: 'unplayable', tile: '11I' },
     ]);
     expect(
-      attempt(state, 'a', { tile: '5B', type: 'placeTile' }).ok,
+      attempt(state, 'a', { type: 'placeTile', tile: '5B' }).ok,
     ).toBe(false);
     expect(
       attempt(state, 'a', { type: 'passPlacement' }).ok,
@@ -224,7 +224,7 @@ describe('mergers', () => {
         c: { ...state.stock['c'], sackson: 4 },
       },
     };
-    state = run(state, 'b', { tile: '4A', type: 'placeTile' });
+    state = run(state, 'b', { type: 'placeTile', tile: '4A' });
     // Sackson at 2 tiles is $200; tied first pools 2000 + 1000.
     expect(state.cash).toEqual({ a: 7500, b: 6000, c: 7500 });
     expect(state.phase).toMatchObject({
@@ -233,26 +233,26 @@ describe('mergers', () => {
       queue: ['c', 'a'],
     });
     state = run(state, 'b', {
+      type: 'disposeStock',
       sell: 1,
       trade: 0,
-      type: 'disposeStock',
     });
     expect(
       attempt(state, 'c', {
+        type: 'disposeStock',
         sell: 0,
         trade: 3,
-        type: 'disposeStock',
       }).ok,
     ).toBe(false);
     state = run(state, 'c', {
+      type: 'disposeStock',
       sell: 0,
       trade: 4,
-      type: 'disposeStock',
     });
     state = run(state, 'a', {
+      type: 'disposeStock',
       sell: 0,
       trade: 0,
-      type: 'disposeStock',
     });
     expect(state.cash['b']).toBe(6200);
     expect(state.stock['c']).toMatchObject({
@@ -278,14 +278,14 @@ describe('mergers', () => {
       },
       hands: { a: ['4A'] },
     });
-    state = run(state, 'a', { tile: '4A', type: 'placeTile' });
+    state = run(state, 'a', { type: 'placeTile', tile: '4A' });
     expect(state.phase).toMatchObject({
       candidates: ['sackson', 'tower'],
       kind: 'chooseSurvivor',
     });
     state = run(state, 'a', {
-      chain: 'sackson',
       type: 'chooseSurvivor',
+      chain: 'sackson',
     });
     expect(chainSize(state, 'sackson')).toBe(6);
     expect(chainSize(state, 'tower')).toBe(0);
@@ -299,12 +299,12 @@ describe('buying and ending', () => {
       phase: { kind: 'buyStock', playerId: 'a' },
     });
     const buy = (purchases: Record<string, number>) =>
-      attempt(state, 'a', { purchases, type: 'endTurn' });
+      attempt(state, 'a', { type: 'endTurn', purchases });
     expect(buy({ tower: 4 }).ok).toBe(false);
     expect(buy({ sackson: 1 }).ok).toBe(false);
     const next = run(state, 'a', {
-      purchases: { tower: 3 },
       type: 'endTurn',
+      purchases: { tower: 3 },
     });
     expect(next.cash['a']).toBe(5400);
     expect(next.hands['a']).toHaveLength(1);
@@ -363,24 +363,24 @@ describe('secrecy', () => {
   it('redacts draws and trades for other viewers', () => {
     const { settings } = state;
     const draw: GameEvent = {
+      type: 'tileDrawn',
       playerId: 'a',
       tile: '9I',
-      type: 'tileDrawn',
     };
     expect(redactEvent(draw, 'b', settings)).toEqual({
-      playerId: 'a',
       type: 'tileDrawn',
+      playerId: 'a',
     });
     expect(redactEvent(draw, 'a', settings)).toBe(draw);
     const buy: GameEvent = {
+      type: 'stockPurchased',
       cost: 600,
       playerId: 'a',
       purchases: { tower: 3 },
-      type: 'stockPurchased',
     };
     expect(redactEvent(buy, null, settings)).toEqual({
-      playerId: 'a',
       type: 'stockPurchased',
+      playerId: 'a',
     });
     expect(
       redactEvent(buy, null, {

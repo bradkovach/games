@@ -49,8 +49,8 @@ describe('GameHub', () => {
     const guest = listener(b.playerId);
     hub.connect(a.gameId, guest.connection);
     hub.handle(a.gameId, guest.connection, {
-      id: '1',
       type: 'start',
+      id: '1',
     });
     expect(guest.messages.at(-1)).toMatchObject({
       type: 'error',
@@ -59,12 +59,12 @@ describe('GameHub', () => {
     const owner = listener(a.playerId);
     hub.connect(a.gameId, owner.connection);
     hub.handle(a.gameId, owner.connection, {
-      id: '2',
       type: 'start',
+      id: '2',
     });
     expect(owner.messages).toContainEqual({
-      id: '2',
       type: 'ack',
+      id: '2',
     });
     expect(() => hub.join(invite.pin, 'Late')).toThrow(
       'already started',
@@ -76,8 +76,8 @@ describe('GameHub', () => {
     const owner = listener(a.playerId);
     hub.connect(a.gameId, owner.connection);
     hub.handle(a.gameId, owner.connection, {
-      id: '1',
       type: 'start',
+      id: '1',
     });
     const before = owner.lastView() as PlayerView;
 
@@ -100,8 +100,8 @@ describe('GameHub', () => {
       hub.connect(a.gameId, l.connection);
     }
     hub.handle(a.gameId, owner.connection, {
-      id: '1',
       type: 'start',
+      id: '1',
     });
 
     const ownerView = owner.lastView() as PlayerView;
@@ -134,5 +134,75 @@ describe('GameHub', () => {
         `"tile":"${tile}"`,
       );
     }
+  });
+
+  describe('avatars', () => {
+    const lobbyAvatars = (messages: ServerMessage[]) => {
+      const lobby = messages
+        .filter((m) => m.type === 'lobby')
+        .at(-1);
+      return lobby?.type === 'lobby'
+        ? lobby.lobby.players.map((p) => p.avatar)
+        : [];
+    };
+
+    it('keeps avatars distinct when joining', async () => {
+      const a = hub.createGame(
+        host,
+        { mode: 'classic', secretHoldings: false },
+        '⚓',
+      );
+      const { pin } = await hub.invite(a.gameId, host.id);
+      expect(() => hub.join(pin, 'Copycat', '⚓')).toThrow(
+        'already taken',
+      );
+      hub.join(pin, 'Guest', '☕');
+      hub.join(pin, 'Auto');
+      expect(hub.avatarsTaken(pin)).toEqual(['⚓', '☕', '☀']);
+    });
+
+    it('lets players change avatars only in the lobby', async () => {
+      const { a, b } = await seatedGame(false);
+      const guest = listener(b.playerId);
+      hub.connect(a.gameId, guest.connection);
+      const [hostAvatar] = lobbyAvatars(guest.messages);
+
+      hub.handle(a.gameId, guest.connection, {
+        type: 'setAvatar',
+        id: '1',
+        avatar: hostAvatar as '☀',
+      });
+      expect(guest.messages.at(-1)).toMatchObject({
+        type: 'error',
+        message: 'That avatar is already taken',
+      });
+
+      hub.handle(a.gameId, guest.connection, {
+        type: 'setAvatar',
+        id: '2',
+        avatar: '⛵',
+      });
+      expect(lobbyAvatars(guest.messages)).toEqual([
+        hostAvatar,
+        '⛵',
+      ]);
+      expect(store.listSeats(a.gameId)[1].avatar).toBe('⛵');
+
+      const owner = listener(a.playerId);
+      hub.connect(a.gameId, owner.connection);
+      hub.handle(a.gameId, owner.connection, {
+        type: 'start',
+        id: '3',
+      });
+      hub.handle(a.gameId, guest.connection, {
+        type: 'setAvatar',
+        id: '4',
+        avatar: '✈',
+      });
+      expect(guest.messages.at(-1)).toMatchObject({
+        type: 'error',
+        message: 'Avatars are locked once the game starts',
+      });
+    });
   });
 });

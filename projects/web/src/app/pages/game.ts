@@ -18,11 +18,14 @@ import { RouterLink } from '@angular/router';
 import type { InviteInfo } from '../../shared/protocol';
 
 import { ActionPanelComponent } from '../components/action-panel';
+import { AvatarPickerComponent } from '../components/avatar-picker';
 import { BoardComponent } from '../components/board';
 import { ChainTableComponent } from '../components/chain-table';
 import { LogPanelComponent } from '../components/log-panel';
 import { PlayersPanelComponent } from '../components/players-panel';
 import { ResultsPanelComponent } from '../components/results-panel';
+import { TickerComponent } from '../components/ticker';
+import { TILE_HINTS, tileHints } from '../components/tile-hints';
 import { Api } from '../services/api';
 import { GameClient } from '../services/game-client';
 import { loadSeat } from '../services/seats';
@@ -31,12 +34,14 @@ import { loadSeat } from '../services/seats';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ActionPanelComponent,
+    AvatarPickerComponent,
     BoardComponent,
     ChainTableComponent,
     LogPanelComponent,
     PlayersPanelComponent,
     ResultsPanelComponent,
     RouterLink,
+    TickerComponent,
   ],
   providers: [GameClient],
   selector: 'app-game',
@@ -50,6 +55,24 @@ import { loadSeat } from '../services/seats';
     }
     .hand button.unplayable {
       background: var(--muted);
+    }
+    .hand-note {
+      border-left: 3px solid var(--muted);
+      font-size: 0.9rem;
+      margin: 0.5rem 0;
+      padding-left: 0.5rem;
+    }
+    .hand-note.dead {
+      border-left-color: var(--danger);
+    }
+    .lobby-players {
+      list-style: none;
+      padding: 0;
+    }
+    .lobby-avatar {
+      display: inline-block;
+      font-size: 1.4rem;
+      width: 2rem;
     }
     .qr {
       max-width: 220px;
@@ -81,14 +104,35 @@ import { loadSeat } from '../services/seats';
                 : ''
             }}
           </p>
-          <ol>
+          <ol class="lobby-players">
             @for (p of lobby.players; track p.id) {
               <li>
+                <span
+                  class="emoji lobby-avatar"
+                  aria-hidden="true"
+                  >{{ client.avatars().get(p.id) }}</span
+                >
                 {{ p.name }}
                 {{ p.id === lobby.hostPlayerId ? '(host)' : '' }}
+                {{ p.id === client.you() ? '(you)' : '' }}
               </li>
             }
           </ol>
+          @if (client.you(); as you) {
+            <details>
+              <summary>Change your mascot</summary>
+              <app-avatar-picker
+                [value]="myAvatar()"
+                [taken]="takenAvatars()"
+                (valueChange)="
+                  $event && client.setAvatar($event)
+                "
+              />
+            </details>
+            @if (client.error(); as error) {
+              <p class="error">{{ error }}</p>
+            }
+          }
           @if (isHost()) {
             <div class="row">
               <button
@@ -146,6 +190,7 @@ import { loadSeat } from '../services/seats';
               <app-board
                 [board]="view.board"
                 [hand]="handTiles()"
+                [hints]="hints()"
                 [selectable]="selectable()"
                 (tileClick)="
                   client.send({
@@ -156,25 +201,41 @@ import { loadSeat } from '../services/seats';
               />
             </section>
             <section class="panel">
-              <h3>Your tiles · \${{ view.me.cash }}</h3>
+              <h3>
+                Your tiles ·
+                <app-ticker
+                  format="currency"
+                  [value]="view.me.cash"
+                />
+              </h3>
               <div class="row hand">
                 @for (t of view.me.hand; track t.tile) {
-                  <button
-                    type="button"
-                    [class]="t.status"
-                    [title]="t.status"
-                    [disabled]="!selectable().includes(t.tile)"
-                    (click)="
-                      client.send({
-                        tile: t.tile,
-                        type: 'placeTile',
-                      })
-                    "
-                  >
-                    {{ t.tile }}
-                  </button>
+                  <span [title]="tileHint[t.status]">
+                    <button
+                      type="button"
+                      [class]="t.status"
+                      [attr.aria-label]="
+                        t.tile + '. ' + tileHint[t.status]
+                      "
+                      [disabled]="!selectable().includes(t.tile)"
+                      (click)="
+                        client.send({
+                          tile: t.tile,
+                          type: 'placeTile',
+                        })
+                      "
+                    >
+                      {{ t.tile }}
+                    </button>
+                  </span>
                 }
               </div>
+              @for (note of handNotes(); track note.status) {
+                <p class="hand-note" [class]="note.status">
+                  <strong>{{ note.tiles }}:</strong>
+                  {{ note.text }}
+                </p>
+              }
               <p class="muted">
                 {{ view.bagCount }} tiles left in the bag.
                 <a
@@ -186,7 +247,11 @@ import { loadSeat } from '../services/seats';
             </section>
           </div>
           <div>
-            <section class="panel">
+            <section
+              class="panel"
+              [class.attention]="myTurn()"
+              [attr.aria-label]="myTurn() ? 'Your turn' : null"
+            >
               @if (view.results; as results) {
                 <h3>Final standings</h3>
                 <app-results-panel
@@ -207,7 +272,9 @@ import { loadSeat } from '../services/seats';
               <app-players-panel
                 [gameMode]="gameMode()"
                 [players]="view.players"
+                [chains]="view.chains"
                 [active]="activePlayer()"
+                [avatars]="client.avatars()"
                 [you]="client.you()"
               />
             </section>
@@ -231,22 +298,38 @@ import { loadSeat } from '../services/seats';
 export class GamePage implements OnInit {
   readonly id = input.required<string>();
   protected readonly client = inject(GameClient);
-  protected readonly gameMode = computed(
-    () => this.client.view()?.settings.mode || 'classic',
-  );
   protected readonly activePlayer = computed(() => {
     // this.client.view()?.settings.mode
     const phase = this.client.view()?.phase;
     return phase && 'playerId' in phase ? phase.playerId : null;
   });
+  protected readonly gameMode = computed(
+    () => this.client.view()?.settings.mode || 'classic',
+  );
   protected readonly view = computed(() => {
     const view = this.client.view();
     return view && 'me' in view ? (view as PlayerView) : null;
+  });
+  protected readonly handNotes = computed(() => {
+    const hand = this.view()?.me.hand ?? [];
+    return (['unplayable', 'dead'] as const)
+      .map((status) => ({
+        status,
+        text: TILE_HINTS[status],
+        tiles: hand
+          .filter((t) => t.status === status)
+          .map((t) => t.tile)
+          .join(', '),
+      }))
+      .filter((note) => note.tiles !== '');
   });
   protected readonly handTiles = computed(() =>
     (this.view()?.me.hand ?? []).map((t) => t.tile),
   );
   protected hasSeat = true;
+  protected readonly hints = computed(() =>
+    tileHints(this.view()?.me.hand ?? []),
+  );
   protected readonly inviteError = signal<null | string>(null);
   protected readonly inviteInfo = signal<InviteInfo | null>(
     null,
@@ -257,6 +340,20 @@ export class GamePage implements OnInit {
       this.client.lobby()?.hostPlayerId ===
         loadSeat(this.id())?.playerId,
   );
+  protected readonly myAvatar = computed(
+    () =>
+      this.client
+        .lobby()
+        ?.players.find((p) => p.id === this.client.you())
+        ?.avatar ?? null,
+  );
+  /** True whenever this player owes the table a decision. */
+  protected readonly myTurn = computed(() => {
+    const view = this.view();
+    if (!view) return false;
+    const { phase } = view;
+    return 'playerId' in phase && phase.playerId === view.me.id;
+  });
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly qr = computed<null | SafeUrl>(() => {
     const info = this.inviteInfo();
@@ -280,6 +377,10 @@ export class GamePage implements OnInit {
       .filter((t) => t.status === 'playable')
       .map((t) => t.tile);
   });
+  protected readonly takenAvatars = computed(() =>
+    (this.client.lobby()?.players ?? []).map((p) => p.avatar),
+  );
+  protected readonly tileHint = TILE_HINTS;
   private readonly api = inject(Api);
 
   ngOnInit(): void {

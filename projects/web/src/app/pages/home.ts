@@ -13,12 +13,13 @@ import {
 
 import type { Me } from '../../shared/protocol';
 
+import { AvatarPickerComponent } from '../components/avatar-picker';
 import { Api } from '../services/api';
 import { saveSeat } from '../services/seats';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [AvatarPickerComponent, RouterLink],
   selector: 'app-home',
   template: `
     <div class="grid-2">
@@ -67,13 +68,17 @@ import { saveSeat } from '../services/seats';
               Keep money and stock secret
             </label>
           </p>
-          <button
-            type="button"
-            [disabled]="busy()"
-            (click)="create()"
-          >
-            Create game
-          </button>
+          <p>Your mascot</p>
+          <app-avatar-picker [(value)]="avatar" />
+          <p>
+            <button
+              type="button"
+              [disabled]="busy()"
+              (click)="create()"
+            >
+              Create game
+            </button>
+          </p>
         } @else {
           <p>Hosting requires signing in.</p>
           <a href="/auth/login?returnTo=/"
@@ -99,6 +104,7 @@ import { saveSeat } from '../services/seats';
   `,
 })
 export class HomePage implements OnInit {
+  protected readonly avatar = signal<null | string>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<null | string>(null);
   protected readonly loading = signal(true);
@@ -115,6 +121,7 @@ export class HomePage implements OnInit {
     this.busy.set(true);
     try {
       const grant = await this.api.createGame({
+        avatar: this.avatar() ?? undefined,
         mode: this.mode(),
         secretHoldings: this.secret(),
       });

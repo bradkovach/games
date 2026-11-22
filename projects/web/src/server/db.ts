@@ -13,6 +13,7 @@ export interface GameRow {
 }
 
 export interface SeatRow {
+  avatar: null | string;
   game_id: string;
   name: string;
   player_id: string;
@@ -70,14 +71,15 @@ export class Store {
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.db.exec(SCHEMA);
+    this.migrate();
   }
 
   addSeat(seat: SeatRow): void {
     this.db
       .prepare(
-        `INSERT INTO seats (game_id, player_id, name, seat_order,
-          token_hash) VALUES (@game_id, @player_id, @name,
-          @seat_order, @token_hash)`,
+        `INSERT INTO seats (game_id, player_id, name, avatar,
+          seat_order, token_hash) VALUES (@game_id, @player_id,
+          @name, @avatar, @seat_order, @token_hash)`,
       )
       .run(seat);
   }
@@ -174,6 +176,23 @@ export class Store {
       .all(gameId) as SeatRow[];
   }
 
+  /** Cheap liveness check for the health endpoint. */
+  ping(): void {
+    this.db.prepare('SELECT 1').get();
+  }
+
+  setAvatar(
+    gameId: string,
+    playerId: string,
+    avatar: string,
+  ): void {
+    this.db
+      .prepare(
+        'UPDATE seats SET avatar = ? WHERE game_id = ? AND player_id = ?',
+      )
+      .run(avatar, gameId, playerId);
+  }
+
   upsertUser(user: {
     email?: string;
     id: string;
@@ -187,5 +206,15 @@ export class Store {
             name = excluded.name`,
       )
       .run(user.id, user.email ?? null, user.name, Date.now());
+  }
+
+  /** Additive schema changes for databases created earlier. */
+  private migrate(): void {
+    const columns = this.db
+      .prepare("SELECT name FROM pragma_table_info('seats')")
+      .all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'avatar')) {
+      this.db.exec('ALTER TABLE seats ADD COLUMN avatar TEXT');
+    }
   }
 }

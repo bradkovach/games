@@ -55,7 +55,9 @@ import { GameClient } from '../services/game-client';
             <app-players-panel
               [gameMode]="view.settings.mode"
               [players]="view.players"
+              [chains]="view.chains"
               [active]="activePlayer()"
+              [avatars]="client.avatars()"
             />
           </section>
           <section class="panel">

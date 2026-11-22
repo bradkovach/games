@@ -61,7 +61,10 @@
                 "input": "projects/web/public"
               }
             ],
-            "styles": ["projects/web/src/styles.css"],
+            "styles": [
+              "@fontsource/noto-emoji/index.css",
+              "projects/web/src/styles.css"
+            ],
             "server": "projects/web/src/main.server.ts",
             "outputMode": "server",
             "security": {

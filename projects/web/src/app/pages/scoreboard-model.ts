@@ -32,9 +32,9 @@ export function emptyScoreboard(): ScoreboardState {
 
 export function newPlayer(n: number): ScoreboardPlayer {
   return {
+    id: `p${Date.now().toString(36)}${n}`,
     cash: 0,
     holdings: {},
-    id: `p${Date.now().toString(36)}${n}`,
     name: `Player ${n}`,
   };
 }

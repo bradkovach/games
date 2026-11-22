@@ -106,11 +106,11 @@ describe('finalScore', () => {
       mode: 'classic',
       players: [
         {
+          id: 'a',
           cash: 1000,
           holdings: { sackson: 5, tower: 2 },
-          id: 'a',
         },
-        { cash: 1400, holdings: { tower: 1 }, id: 'b' },
+        { id: 'b', cash: 1400, holdings: { tower: 1 } },
       ],
     });
     expect(results.finalCash).toEqual({ a: 3400, b: 2600 });

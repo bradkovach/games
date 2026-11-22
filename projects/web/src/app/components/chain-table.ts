@@ -9,54 +9,70 @@ import {
   type ChainSummary,
 } from 'engine';
 
+import { TickerComponent } from './ticker';
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TickerComponent],
   selector: 'app-chain-table',
-  styles: [
-    `
-      .muted {
-        color: #999;
-      }
-      th.chain {
-        color: #fff;
-        text-shadow: 0 1px 1px rgb(0 0 0 / 40%);
-      }
-    `,
-  ],
+  styles: `
+    tr.inactive td,
+    td.zero {
+      color: var(--muted);
+    }
+  `,
   template: `
     <table>
       <thead>
         <tr>
           <th>Chain</th>
-          <th class="num">Size</th>
+          <th class="figure">Size</th>
           <th class="num">Price</th>
-          <th class="num">Bank</th>
+          <th class="figure">Bank</th>
           @if (mine()) {
-            <th class="num">Yours</th>
+            <th class="figure">You</th>
           }
         </tr>
       </thead>
       <tbody>
         @for (chain of chains(); track chain.chain) {
-          <tr [class.muted]="!chain.active">
+          <tr [class.inactive]="!chain.active">
             <th
               scope="row"
-              class="chain chain-{{ chain.chain }}"
+              class="chain narrow chain-{{ chain.chain }}"
             >
-              @if (chain.safe) {
-                <span title="Safe; chain size > 10">{{
-                  lockIcon
-                }}</span>
-              }
               {{ names[chain.chain] }}
             </th>
-            <td class="num">{{ chain.size || '–' }}</td>
-            <td class="num">
-              {{ chain.price ? '$' + chain.price : '–' }}
+            <td class="figure">
+              {{ chain.size || '–' }}
+              @if (chain.safe) {
+                <span
+                  class="glyph-text"
+                  title="Safe; chain size > 10"
+                  >{{ lockIcon }}</span
+                >
+              }
             </td>
-            <td class="num">{{ chain.bank }}</td>
+            <td class="num">
+              @if (chain.price) {
+                <app-ticker
+                  format="currency"
+                  [value]="chain.price"
+                />
+              } @else {
+                –
+              }
+            </td>
+            <td class="figure">
+              <app-ticker [value]="chain.bank" />
+            </td>
             @if (mine(); as mine) {
-              <td class="num">{{ mine[chain.chain] || '' }}</td>
+              <td
+                class="figure"
+                [class.zero]="!mine[chain.chain]"
+              >
+                <app-ticker [value]="mine[chain.chain]" />
+              </td>
             }
           </tr>
         }
@@ -65,8 +81,8 @@ import {
   `,
 })
 export class ChainTableComponent {
-  readonly lockIcon = '\u{1F512}\u{FE0E}';
   readonly chains = input.required<ChainSummary[]>();
+  readonly lockIcon = '\u{1F512}\u{FE0E}';
   readonly mine = input<ChainCounts | null>(null);
   protected readonly names = CHAIN_NAMES;
 }

@@ -6,17 +6,28 @@ import {
 } from 'engine';
 import { z } from 'zod';
 
+import { isAvatar } from './avatars';
+
+const AvatarSchema = z
+  .string()
+  .refine(isAvatar, { message: 'Unknown avatar' });
+
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
-    command: z.unknown(),
-    id: z.string().max(64),
     type: z.literal('command'),
+    id: z.string().max(64),
+    command: z.unknown(),
   }),
   z.object({
-    seatToken: z.string().max(128).optional(),
     type: z.literal('hello'),
+    seatToken: z.string().max(128).optional(),
   }),
-  z.object({ id: z.string().max(64), type: z.literal('start') }),
+  z.object({ type: z.literal('start'), id: z.string().max(64) }),
+  z.object({
+    type: z.literal('setAvatar'),
+    id: z.string().max(64),
+    avatar: AvatarSchema,
+  }),
 ]);
 export type ActionMessage = Exclude<
   ClientMessage,
@@ -27,7 +38,7 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 export interface LobbyInfo {
   hostPlayerId: string;
   id: string;
-  players: { id: string; name: string }[];
+  players: { avatar: string; id: string; name: string }[];
   settings: z.infer<typeof GameSettingsSchema>;
   started: boolean;
 }
@@ -46,11 +57,17 @@ export type ServerMessage =
   | { lobby: LobbyInfo; type: 'lobby' };
 
 export const JoinRequestSchema = z.object({
+  avatar: AvatarSchema.optional(),
   code: z.string().min(1).max(512),
   name: z.string().trim().min(1).max(40),
 });
 
+export const AvatarsQuerySchema = z.object({
+  code: z.string().min(1).max(512),
+});
+
 export const CreateGameSchema = z.object({
+  avatar: AvatarSchema.optional(),
   mode: z.enum(['classic', 'tycoon']).default('classic'),
   secretHoldings: z.boolean().default(false),
 });

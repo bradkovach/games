@@ -12,6 +12,7 @@ import { existsSync } from 'node:fs';
 import { ZodError } from 'zod';
 
 import {
+  AvatarsQuerySchema,
   ClientMessageSchema,
   CreateGameSchema,
   JoinRequestSchema,
@@ -85,10 +86,10 @@ export function buildApp(
       const user = currentUser(request);
       if (!user)
         return reply.code(401).send({ error: 'Sign in first' });
-      const settings = CreateGameSchema.parse(
+      const { avatar, ...settings } = CreateGameSchema.parse(
         request.body ?? {},
       );
-      return services().hub.createGame(user, settings);
+      return services().hub.createGame(user, settings, avatar);
     });
 
     scoped.post(
@@ -106,7 +107,21 @@ export function buildApp(
 
     scoped.post('/api/join', async (request) => {
       const body = JoinRequestSchema.parse(request.body);
-      return services().hub.join(body.code, body.name);
+      return services().hub.join(
+        body.code,
+        body.name,
+        body.avatar,
+      );
+    });
+
+    scoped.get('/api/join/avatars', async (request) => {
+      const { code } = AvatarsQuerySchema.parse(request.query);
+      return { taken: services().hub.avatarsTaken(code) };
+    });
+
+    scoped.get('/api/health', async () => {
+      services().store.ping();
+      return { ok: true };
     });
 
     scoped.get(
@@ -176,9 +191,9 @@ function handleSocket(
     const parsed = ClientMessageSchema.safeParse(json);
     if (!parsed.success) {
       return send({
+        type: 'error',
         id: '',
         message: 'Invalid message',
-        type: 'error',
       });
     }
     const message = parsed.data;

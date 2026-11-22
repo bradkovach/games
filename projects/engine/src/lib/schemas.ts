@@ -28,34 +28,34 @@ const ChainCountsSchema = z.partialRecord(
 
 /** Player intents. Shape is validated here; legality in `decide`. */
 export const CommandSchema = z.discriminatedUnion('type', [
-  z.object({ tile: TileIdSchema, type: z.literal('placeTile') }),
+  z.object({ type: z.literal('placeTile'), tile: TileIdSchema }),
   z.object({ type: z.literal('passPlacement') }),
   z.object({
-    chain: ChainIdSchema,
     type: z.literal('foundChain'),
+    chain: ChainIdSchema,
   }),
   z.object({
-    chain: ChainIdSchema,
     type: z.literal('chooseSurvivor'),
-  }),
-  z.object({
     chain: ChainIdSchema,
-    type: z.literal('chooseAcquired'),
   }),
   z.object({
+    type: z.literal('chooseAcquired'),
+    chain: ChainIdSchema,
+  }),
+  z.object({
+    type: z.literal('disposeStock'),
     sell: z.int().min(0).max(25),
     trade: z
       .int()
       .min(0)
       .max(25)
       .refine((n) => n % 2 === 0, 'Trades must be 2-for-1'),
-    type: z.literal('disposeStock'),
   }),
   z.object({ type: z.literal('declareEnd') }),
   z.object({
+    type: z.literal('endTurn'),
     discardDead: z.boolean().default(true),
     purchases: ChainCountsSchema.default({}),
-    type: z.literal('endTurn'),
   }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
@@ -120,96 +120,96 @@ export type GameResults = z.infer<typeof GameResultsSchema>;
  */
 export const GameEventSchema = z.discriminatedUnion('type', [
   z.object({
+    type: z.literal('gameStarted'),
     players: z.array(PlayerInfoSchema),
     settings: GameSettingsSchema,
-    type: z.literal('gameStarted'),
   }),
   z.object({
+    type: z.literal('startTileDrawn'),
     playerId: PlayerIdSchema,
     tile: TileIdSchema,
-    type: z.literal('startTileDrawn'),
   }),
   z.object({
-    order: z.array(PlayerIdSchema),
     type: z.literal('turnOrderSet'),
+    order: z.array(PlayerIdSchema),
   }),
   z.object({
+    type: z.literal('tileDrawn'),
     playerId: PlayerIdSchema,
     tile: TileIdSchema.optional(),
-    type: z.literal('tileDrawn'),
   }),
   z.object({
+    type: z.literal('tilePlaced'),
     playerId: PlayerIdSchema,
     tile: TileIdSchema,
-    type: z.literal('tilePlaced'),
   }),
   z.object({
-    playerId: PlayerIdSchema,
     type: z.literal('placementPassed'),
+    playerId: PlayerIdSchema,
   }),
   z.object({
+    type: z.literal('chainFounded'),
     chain: ChainIdSchema,
     founderCash: z.int().min(0),
     founderShare: z.boolean(),
     playerId: PlayerIdSchema,
     tiles: z.array(TileIdSchema),
-    type: z.literal('chainFounded'),
   }),
   z.object({
+    type: z.literal('chainGrown'),
     chain: ChainIdSchema,
     tiles: z.array(TileIdSchema),
-    type: z.literal('chainGrown'),
   }),
   z.object({
+    type: z.literal('mergeStarted'),
     chains: z.array(ChainIdSchema),
     playerId: PlayerIdSchema,
     tile: TileIdSchema,
-    type: z.literal('mergeStarted'),
   }),
   z.object({
+    type: z.literal('bonusesPaid'),
     chain: ChainIdSchema,
     final: z.boolean(),
     payouts: PayoutsSchema,
-    type: z.literal('bonusesPaid'),
   }),
   z.object({
+    type: z.literal('stockDisposed'),
     cash: z.int().min(0).optional(),
     chain: ChainIdSchema,
     playerId: PlayerIdSchema,
     sell: z.int().min(0).optional(),
     survivor: ChainIdSchema,
     trade: z.int().min(0).optional(),
-    type: z.literal('stockDisposed'),
   }),
   z.object({
+    type: z.literal('chainAcquired'),
     chain: ChainIdSchema,
     survivor: ChainIdSchema,
-    type: z.literal('chainAcquired'),
   }),
   z.object({
+    type: z.literal('mergeCompleted'),
     survivor: ChainIdSchema,
     tiles: z.array(TileIdSchema),
-    type: z.literal('mergeCompleted'),
   }),
   z.object({
+    type: z.literal('stockPurchased'),
     cost: z.int().min(0).optional(),
     playerId: PlayerIdSchema,
     purchases: ChainCountsSchema.optional(),
-    type: z.literal('stockPurchased'),
   }),
   z.object({
+    type: z.literal('tilesDiscarded'),
     playerId: PlayerIdSchema,
     tiles: z.array(TileIdSchema),
-    type: z.literal('tilesDiscarded'),
   }),
   z.object({
-    playerId: PlayerIdSchema,
     type: z.literal('endDeclared'),
+    playerId: PlayerIdSchema,
   }),
-  z.object({ phase: PhaseSchema, type: z.literal('phaseSet') }),
+  z.object({ type: z.literal('phaseSet'), phase: PhaseSchema }),
   z.object({
-    results: GameResultsSchema,
     type: z.literal('gameEnded'),
+    results: GameResultsSchema,
   }),
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;

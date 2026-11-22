@@ -17,6 +17,7 @@ import type {
   ServerMessage,
 } from '../../shared/protocol';
 
+import { avatarEmoji } from '../../shared/avatars';
 import { loadSeat } from './seats';
 
 const LOG_LIMIT = 300;
@@ -24,9 +25,17 @@ const LOG_LIMIT = 300;
 /** One live connection to a game, exposed as signals. */
 @Injectable()
 export class GameClient implements OnDestroy {
+  readonly lobby = signal<LobbyInfo | null>(null);
+  /** Player id → avatar glyph, ready to render as text. */
+  readonly avatars = computed(() => {
+    const map = new Map<string, string>();
+    for (const p of this.lobby()?.players ?? []) {
+      if (p.avatar) map.set(p.id, avatarEmoji(p.avatar));
+    }
+    return map;
+  });
   readonly connected = signal(false);
   readonly error = signal<null | string>(null);
-  readonly lobby = signal<LobbyInfo | null>(null);
   readonly log = signal<GameEvent[]>([]);
   readonly view = signal<null | PlayerView | PublicView>(null);
   readonly me = computed(() => {
@@ -63,11 +72,15 @@ export class GameClient implements OnDestroy {
   }
 
   send(command: CommandInput): void {
-    this.post({ command, id: this.nextId(), type: 'command' });
+    this.post({ type: 'command', id: this.nextId(), command });
+  }
+
+  setAvatar(avatar: string): void {
+    this.post({ type: 'setAvatar', id: this.nextId(), avatar });
   }
 
   start(): void {
-    this.post({ id: this.nextId(), type: 'start' });
+    this.post({ type: 'start', id: this.nextId() });
   }
 
   private handle(message: ServerMessage): void {
@@ -112,8 +125,8 @@ export class GameClient implements OnDestroy {
       const seat = this.spectate ? null : loadSeat(this.gameId);
       socket.send(
         JSON.stringify({
-          seatToken: seat?.seatToken,
           type: 'hello',
+          seatToken: seat?.seatToken,
         }),
       );
     };

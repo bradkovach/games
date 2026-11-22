@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,22 +15,22 @@ import {
 } from 'engine';
 
 import { GameClient } from '../services/game-client';
-import { DecimalPipe } from '@angular/common';
+import { PreferencesService } from '../services/preferences';
+import { TickerComponent } from './ticker';
+
+/** Time to cancel before an automatic end of turn. */
+export const AUTO_END_DELAY_MS = 1500;
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DecimalPipe, TickerComponent],
   selector: 'app-action-panel',
-  imports: [DecimalPipe],
   styles: `
     .buy {
       display: grid;
       gap: 0.3rem;
       grid-template-columns: auto 1fr auto;
       margin: 0.5rem 0;
-    }
-    .chain {
-      color: #fff;
-      text-shadow: 0 1px 1px rgb(0 0 0 / 40%);
     }
     .padding-0 {
       padding: 0;
@@ -56,21 +57,17 @@ import { DecimalPipe } from '@angular/common';
       align-items: center;
       justify-content: center;
       /* reset button to a simple grey, no borders */
-      background: #ddd;
+      background: var(--neutral);
       border: none;
-      color: #000;
+      color: var(--ink);
       border-radius: 0;
-      cursor: pointer;
       padding: 0.3rem 0.5rem;
-      &:hover {
-        background: #eee;
+      &:hover:not(:disabled) {
+        background: var(--neutral-hover);
       }
     }
-    .actions .actions__action[disabled] {
-      background: #ccc;
-    }
     .actions .actions__action + .actions__action {
-      border-left: 1px solid #ccc;
+      border-left: 1px solid var(--line);
     }
 
     /* stretches in main axis; fills cross axis, centered */
@@ -84,6 +81,17 @@ import { DecimalPipe } from '@angular/common';
       text-align: right;
       /* use tabular numbers to prevent shifting */
       font-variant-numeric: tabular-nums;
+    }
+
+    .auto-end {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .auto-pref {
+      display: block;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
     }
 
     tfoot td,
@@ -247,11 +255,14 @@ import { DecimalPipe } from '@angular/common';
                     </th>
                     <td class="figure">{{ c.bank }}</td>
                     <td class="num">
-                      \${{ c.price | number: '1.0-0' }}
+                      <app-ticker
+                        format="currency"
+                        [value]="c.price"
+                      />
                     </td>
                     <td
                       class="figure"
-                      [class.text-muted]="owned === 0"
+                      [class.muted]="owned === 0"
                       title="Your stock. {{
                         owned
                       }} shares worth {{ '$' }}{{
@@ -295,8 +306,11 @@ import { DecimalPipe } from '@angular/common';
             <tfoot>
               <tr>
                 <td colspan="4">
-                  You have {{ '$'
-                  }}{{ view.me.cash | number: '1.0-0' }}.
+                  You have
+                  <app-ticker
+                    format="currency"
+                    [value]="view.me.cash"
+                  />.
                 </td>
                 <td class="figure">{{ totalBuys() }}</td>
                 <td class="num">
@@ -331,41 +345,83 @@ import { DecimalPipe } from '@angular/common';
         @default {
           @if (view.phase.kind === 'gameOver') {
             <h3>Game over</h3>
-          } @else if (waitingOn(); as name) {
-            <p class="muted">Waiting for {{ name }}…</p>
+          } @else if (waitingOn(); as who) {
+            <p class="muted">
+              Waiting for
+              @if (who.avatar) {
+                <span class="emoji" aria-hidden="true">{{
+                  who.avatar
+                }}</span>
+              }
+              {{ who.name }}…
+            </p>
           }
         }
       }
+      @if (autoEndPending()) {
+        <p class="auto-end" role="status">
+          Nothing to do — ending your turn…
+          <button
+            type="button"
+            class="secondary"
+            (click)="cancelAutoEnd()"
+          >
+            Cancel
+          </button>
+        </p>
+      }
+      @if (autoEndHeld()) {
+        <p class="auto-end held" role="status">
+          You have no other moves, but your turn wasn't ended
+          automatically because
+          {{
+            view.endDeclared
+              ? 'ending it finishes the game.'
+              : 'you can declare the game over.'
+          }}
+        </p>
+      }
       @if (client.error(); as error) {
         <p class="error">{{ error }}</p>
+      }
+      @if (view.phase.kind !== 'gameOver') {
+        <label class="muted auto-pref"
+          ><input
+            type="checkbox"
+            [checked]="prefs.autoEndTurn()"
+            (change)="
+              prefs.autoEndTurn.set(!prefs.autoEndTurn())
+            "
+          />
+          Automatically end my turn when I have no moves</label
+        >
       }
     }
   `,
 })
 export class ActionPanelComponent {
+  protected readonly buys = signal<
+    Partial<Record<ChainId, number>>
+  >({});
+  readonly totalBuys = computed(() =>
+    Object.values(this.buys()).reduce(
+      (sum, count) => sum + (count ?? 0),
+      0,
+    ),
+  );
+
   protected readonly client = inject(GameClient);
+
   protected readonly view = computed(() => {
     const view = this.client.view();
     return view && 'me' in view ? (view as PlayerView) : null;
   });
 
-  protected readonly available = computed(() =>
-    (this.view()?.chains ?? [])
-      .filter((c) => !c.active)
-      .map((c) => c.chain),
+  protected readonly hasPlayable = computed(() =>
+    (this.view()?.me.hand ?? []).some(
+      (t) => t.status === 'playable',
+    ),
   );
-
-  protected readonly buys = signal<
-    Partial<Record<ChainId, number>>
-  >({});
-
-  readonly totalBuys = computed(() =>
-    Object.values(this.buys()).reduce((a, b) => a + b, 0),
-  );
-  protected readonly canDeclare = computed(() => {
-    const view = this.view();
-    return !!view && view.canDeclareEnd && !view.endDeclared;
-  });
   protected readonly myPhase = computed(() => {
     const view = this.view();
     if (!view) return null;
@@ -374,12 +430,68 @@ export class ActionPanelComponent {
       ? phase
       : null;
   });
+  /**
+   * The only move left: skipping placement with no playable tile,
+   * or ending the turn when no share is affordable.
+   */
+  protected readonly forcedAction = computed(
+    (): 'endTurn' | 'passPlacement' | null => {
+      const view = this.view();
+      const phase = this.myPhase();
+      if (!view || !phase) return null;
+      if (phase.kind === 'placeTile' && !this.hasPlayable()) {
+        return 'passPlacement';
+      }
+      if (
+        phase.kind === 'buyStock' &&
+        !view.chains.some(
+          (c) =>
+            c.active && c.bank > 0 && c.price <= view.me.cash,
+        )
+      ) {
+        return 'endTurn';
+      }
+      return null;
+    },
+  );
+  protected readonly prefs = inject(PreferencesService);
+  /**
+   * Auto-end never fires while declaring the end is possible, so
+   * the player keeps the choice to finish the game.
+   */
+  protected readonly autoEndHeld = computed(() => {
+    const view = this.view();
+    return (
+      this.prefs.autoEndTurn() &&
+      !!this.forcedAction() &&
+      !!view &&
+      (view.canDeclareEnd || view.endDeclared)
+    );
+  });
+  protected readonly autoAction = computed(() =>
+    this.prefs.autoEndTurn() && !this.autoEndHeld()
+      ? this.forcedAction()
+      : null,
+  );
+  protected readonly autoEndPending = signal(false);
+  protected readonly available = computed(() =>
+    (this.view()?.chains ?? [])
+      .filter((c) => !c.active)
+      .map((c) => c.chain),
+  );
+
+  protected readonly canDeclare = computed(() => {
+    const view = this.view();
+    return !!view && view.canDeclareEnd && !view.endDeclared;
+  });
+
   protected readonly candidates = computed(() => {
     const phase = this.myPhase();
     return phase && 'candidates' in phase
       ? phase.candidates
       : [];
   });
+
   protected readonly cost = computed(() => {
     const view = this.view();
     if (!view) return 0;
@@ -388,8 +500,18 @@ export class ActionPanelComponent {
       0,
     );
   });
+  /**
+   * Identifies the decision being made. Every server message builds
+   * a new phase object, so the inputs reset on this string instead.
+   */
+  protected readonly decisionKey = computed(() => {
+    const phase = this.myPhase();
+    if (!phase) return '';
+    return 'acquired' in phase
+      ? `${phase.kind}:${phase.acquired}`
+      : phase.kind;
+  });
   protected readonly discard = signal(true);
-
   protected readonly dispose = computed(() => {
     const phase = this.myPhase();
     const view = this.view();
@@ -410,7 +532,6 @@ export class ActionPanelComponent {
   });
 
   protected readonly sell = signal(0);
-
   protected readonly trade = signal(0);
   protected readonly disposeValid = computed(() => {
     const d = this.dispose();
@@ -425,28 +546,47 @@ export class ActionPanelComponent {
       sell + trade <= d.owned
     );
   });
-  protected readonly hasPlayable = computed(() =>
-    (this.view()?.me.hand ?? []).some(
-      (t) => t.status === 'playable',
-    ),
-  );
   protected readonly names = CHAIN_NAMES;
-
   protected readonly waitingOn = computed(() => {
     const phase = this.client.view()?.phase;
-    return phase && 'playerId' in phase
-      ? (this.client.names().get(phase.playerId) ??
-          'another player')
-      : null;
+    if (!phase || !('playerId' in phase)) return null;
+    return {
+      avatar: this.client.avatars().get(phase.playerId),
+      name:
+        this.client.names().get(phase.playerId) ??
+        'another player',
+    };
   });
+
+  /** Decision for which the player cancelled auto-end. */
+  private readonly autoEndCancelled = signal<null | string>(
+    null,
+  );
 
   constructor() {
     // Reset local inputs whenever the decision changes.
     effect(() => {
-      this.myPhase();
+      this.decisionKey();
       this.buys.set({});
       this.sell.set(0);
       this.trade.set(0);
+      this.autoEndCancelled.set(null);
+    });
+
+    effect((onCleanup) => {
+      const action = this.autoAction();
+      const key = this.decisionKey();
+      if (!action || this.autoEndCancelled() === key) {
+        this.autoEndPending.set(false);
+        return;
+      }
+      this.autoEndPending.set(true);
+      const timer = setTimeout(() => {
+        this.autoEndPending.set(false);
+        if (action === 'endTurn') this.endTurn();
+        else this.client.send({ type: 'passPlacement' });
+      }, AUTO_END_DELAY_MS);
+      onCleanup(() => clearTimeout(timer));
     });
   }
 
@@ -461,15 +601,15 @@ export class ActionPanelComponent {
     const view = this.view();
     const summary = view?.chains.find((c) => c.chain === chain);
     if (!view || !summary) return false;
-    const total = Object.values(this.buys()).reduce(
-      (a, b) => a + (b ?? 0),
-      0,
-    );
     return (
-      total < MAX_PURCHASE &&
+      this.totalBuys() < MAX_PURCHASE &&
       (this.buys()[chain] ?? 0) < summary.bank &&
       this.cost() + summary.price <= view.me.cash
     );
+  }
+
+  protected cancelAutoEnd(): void {
+    this.autoEndCancelled.set(this.decisionKey());
   }
 
   protected declare(): void {
@@ -480,9 +620,9 @@ export class ActionPanelComponent {
 
   protected endTurn(): void {
     this.client.send({
+      type: 'endTurn',
       discardDead: this.discard(),
       purchases: this.buys(),
-      type: 'endTurn',
     });
   }
 
@@ -497,9 +637,9 @@ export class ActionPanelComponent {
 
   protected submitDispose(): void {
     this.client.send({
+      type: 'disposeStock',
       sell: this.sell(),
       trade: this.trade(),
-      type: 'disposeStock',
     });
   }
 }

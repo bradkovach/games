@@ -19,6 +19,25 @@ describe('HTTP API', () => {
 
   afterAll(() => app.close());
 
+  it('reports health', async () => {
+    const health = await app.inject({ url: '/api/health' });
+    expect(health.statusCode).toBe(200);
+    expect(health.json()).toEqual({ ok: true });
+  });
+
+  it('rejects unknown avatars and invites', async () => {
+    const avatar = await app.inject({
+      body: { avatar: '🦄', code: '000-000-000', name: 'Eve' },
+      method: 'POST',
+      url: '/api/join',
+    });
+    expect(avatar.statusCode).toBe(400);
+    const taken = await app.inject({
+      url: '/api/join/avatars?code=000-000-000',
+    });
+    expect(taken.statusCode).toBe(400);
+  });
+
   it('requires sign-in to host', async () => {
     const me = await app.inject({
       method: 'GET',

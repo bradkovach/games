@@ -11,6 +11,17 @@
       >Scoreboard</a
     >
   </nav>
+  <label class="theme">
+    <span class="visually-hidden">Colour theme</span>
+    <select
+      [value]="theme.preference()"
+      (change)="setTheme($event)"
+    >
+      <option value="system">System theme</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </label>
 </header>
 <main>
   <router-outlet />

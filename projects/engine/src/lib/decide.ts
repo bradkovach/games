@@ -59,7 +59,7 @@ class Emitter {
     const pile = remainingTiles(this.state);
     if (pile.length === 0) return false;
     const tile = pile[Math.floor(this.random() * pile.length)];
-    this.emit({ playerId, tile, type: 'tileDrawn' });
+    this.emit({ type: 'tileDrawn', playerId, tile });
     return true;
   }
 
@@ -69,7 +69,7 @@ class Emitter {
   }
 
   phase(phase: Phase): void {
-    this.emit({ phase, type: 'phaseSet' });
+    this.emit({ type: 'phaseSet', phase });
   }
 }
 
@@ -111,19 +111,19 @@ export function startGame(
     fail('Acquire needs 2-6 players');
   }
   const out = new Emitter(initialState(), random);
-  out.emit({ players, settings, type: 'gameStarted' });
+  out.emit({ type: 'gameStarted', players, settings });
   const starts: { playerId: string; tile: TileId }[] = [];
   for (const { id } of players) {
     const pile = remainingTiles(out.state);
     const tile = pile[Math.floor(random() * pile.length)];
     starts.push({ playerId: id, tile });
-    out.emit({ playerId: id, tile, type: 'startTileDrawn' });
+    out.emit({ type: 'startTileDrawn', playerId: id, tile });
   }
   const first = [...starts].sort((a, b) =>
     compareTiles(a.tile, b.tile),
   )[0].playerId;
   const order = seatsFrom(out.state, first);
-  out.emit({ order, type: 'turnOrderSet' });
+  out.emit({ type: 'turnOrderSet', order });
   for (const id of order) {
     for (let i = 0; i < HAND_SIZE; i++) out.draw(id);
   }
@@ -140,9 +140,9 @@ function continueMerge(
 ) {
   if (remaining.length === 0) {
     out.emit({
+      type: 'mergeCompleted',
       survivor,
       tiles: unincorporatedGroup(out.state, tile),
-      type: 'mergeCompleted',
     });
     return out.phase({ kind: 'buyStock', playerId: mergemaker });
   }
@@ -190,13 +190,13 @@ function disposeStock(
       chainSize(out.state, acquired),
     );
     out.emit({
+      type: 'stockDisposed',
       cash: sell * price,
       chain: acquired,
       playerId,
       sell,
       survivor,
       trade,
-      type: 'stockDisposed',
     });
   }
   const { mergemaker, remaining, tile } = phase;
@@ -213,22 +213,22 @@ function endGame(out: Emitter) {
     chainSizes: chainSizes(state),
     mode: state.settings.mode,
     players: state.players.map((p) => ({
+      id: p.id,
       cash: state.cash[p.id],
       holdings: state.stock[p.id],
-      id: p.id,
     })),
   });
   for (const [chain, payouts] of Object.entries(
     results.bonuses,
   )) {
     out.emit({
+      type: 'bonusesPaid',
       chain: chain as ChainId,
       final: true,
       payouts,
-      type: 'bonusesPaid',
     });
   }
-  out.emit({ results, type: 'gameEnded' });
+  out.emit({ type: 'gameEnded', results });
   out.phase({ kind: 'gameOver' });
 }
 
@@ -259,10 +259,10 @@ function endTurn(
   if (cost > out.state.cash[playerId]) fail('Not enough cash');
   if (purchases.length > 0) {
     out.emit({
+      type: 'stockPurchased',
       cost,
       playerId,
       purchases: Object.fromEntries(purchases),
-      type: 'stockPurchased',
     });
   }
 
@@ -275,9 +275,9 @@ function endTurn(
     );
     if (dead.length > 0) {
       out.emit({
+        type: 'tilesDiscarded',
         playerId,
         tiles: dead,
-        type: 'tilesDiscarded',
       });
       dead.forEach(() => out.draw(playerId));
     }
@@ -345,7 +345,7 @@ function handle(
       if (!canDeclareEnd(out.state)) {
         fail('The game end conditions are not met');
       }
-      return out.emit({ playerId, type: 'endDeclared' });
+      return out.emit({ type: 'endDeclared', playerId });
     case 'disposeStock':
       if (phase.kind !== 'disposeStock')
         fail('Unexpected command');
@@ -367,6 +367,7 @@ function handle(
       const tiles = unincorporatedGroup(out.state, phase.tile);
       const founderShare = out.state.bank[command.chain] > 0;
       out.emit({
+        type: 'chainFounded',
         chain: command.chain,
         founderCash: founderShare
           ? 0
@@ -374,7 +375,6 @@ function handle(
         founderShare,
         playerId,
         tiles,
-        type: 'chainFounded',
       });
       return out.phase({ kind: 'buyStock', playerId });
     }
@@ -383,7 +383,7 @@ function handle(
       if (hasPlayableTile(out.state, playerId)) {
         fail('You have a playable tile');
       }
-      out.emit({ playerId, type: 'placementPassed' });
+      out.emit({ type: 'placementPassed', playerId });
       return out.phase({ kind: 'buyStock', playerId });
     case 'placeTile':
       if (phase.kind !== 'placeTile') fail('Unexpected command');
@@ -406,9 +406,9 @@ function nextHolder(
     });
   }
   out.emit({
+    type: 'chainAcquired',
     chain: context.acquired,
     survivor: context.survivor,
-    type: 'chainAcquired',
   });
   continueMerge(
     out,
@@ -434,26 +434,26 @@ function placeTile(
   if (placement.kind === 'unplayable') {
     fail('No chains are available to found');
   }
-  out.emit({ playerId, tile, type: 'tilePlaced' });
+  out.emit({ type: 'tilePlaced', playerId, tile });
 
   switch (placement.kind) {
     case 'found':
       return out.phase({ kind: 'foundChain', playerId, tile });
     case 'grow':
       out.emit({
+        type: 'chainGrown',
         chain: placement.chain,
         tiles: placement.group,
-        type: 'chainGrown',
       });
       return out.phase({ kind: 'buyStock', playerId });
     case 'independent':
       return out.phase({ kind: 'buyStock', playerId });
     case 'merge': {
       out.emit({
+        type: 'mergeStarted',
         chains: placement.chains,
         playerId,
         tile,
-        type: 'mergeStarted',
       });
       const sizes = chainSizes(out.state);
       const largest = Math.max(
@@ -497,6 +497,7 @@ function startAcquisition(
     ]),
   );
   out.emit({
+    type: 'bonusesPaid',
     chain: acquired,
     final: false,
     payouts: computeBonuses(
@@ -505,7 +506,6 @@ function startAcquisition(
       chainSize(state, acquired),
       state.settings.mode,
     ),
-    type: 'bonusesPaid',
   });
   const holders = seatsFrom(state, mergemaker).filter(
     (id) => state.stock[id][acquired] > 0,
