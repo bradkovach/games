@@ -2,6 +2,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
+  type ChainId,
   ChainIdSchema,
   type CommandInput,
   CommandSchema,
@@ -479,12 +480,42 @@ export function createAgentServer(
       purchases,
     }),
   );
-  tool(
+  server.registerTool(
     'declare_game_end',
-    'Declare the game over',
-    'Declare that the game ends after this turn (only when a chain has 41+ tiles or all chains are safe).',
-    {},
-    () => ({ type: 'declareEnd' }),
+    {
+      description:
+        'Declare that the game ends after this turn (only when a chain has 41+ tiles or all chains are safe). If you have already placed your tile, this also buys the given shares (or none) and ends your turn, so no further call is needed.',
+      inputSchema: {
+        discardDead: z.boolean().default(true),
+        purchases: z
+          .partialRecord(
+            ChainIdSchema,
+            z.number().int().min(0).max(3),
+          )
+          .default({}),
+      },
+      outputSchema: OutputSchema,
+      title: 'Declare the game over',
+    },
+    guarded(
+      ({
+        discardDead,
+        purchases,
+      }: {
+        discardDead: boolean;
+        purchases: Partial<Record<ChainId, number>>;
+      }) => {
+        const declared = command({ type: 'declareEnd' });
+        if (declared.isError) return declared;
+        const phase = session.seat?.view?.phase;
+        if (phase?.kind !== 'buyStock') return declared;
+        return command({
+          type: 'endTurn',
+          discardDead,
+          purchases,
+        });
+      },
+    ) as never,
   );
 
   server.registerTool(

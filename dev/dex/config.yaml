@@ -1,7 +1,7 @@
 # Development-only Dex configuration. Replace the password
 # connector with real connectors (GitHub, Google, LDAP, ...) in
 # production: https://dexidp.io/docs/connectors/
-issuer: http://localhost:5556/dex
+issuer: https://auth.zombarista.io
 
 storage:
   type: memory
@@ -15,8 +15,9 @@ oauth2:
 staticClients:
   - id: acquire
     name: Acquire
-    secret: acquire-dev-secret
+    secretEnv: OIDC_CLIENT_SECRET
     redirectURIs:
+      - https://games.zombarista.io/auth/callback
       - http://localhost:4200/auth/callback
       - http://localhost:4000/auth/callback
 

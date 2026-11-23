@@ -4,10 +4,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  ElementRef,
   inject,
   input,
   type OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import {
   DomSanitizer,
@@ -20,13 +23,12 @@ import type { InviteInfo } from '../../shared/protocol';
 import { ActionPanelComponent } from '../components/action-panel';
 import { AvatarPickerComponent } from '../components/avatar-picker';
 import { BoardComponent } from '../components/board';
-import { ChainTableComponent } from '../components/chain-table';
 import { ChatPanelComponent } from '../components/chat-panel';
+import { InfoTableComponent } from '../components/info-table';
 import { LogPanelComponent } from '../components/log-panel';
-import { PlayersPanelComponent } from '../components/players-panel';
 import { ResultsPanelComponent } from '../components/results-panel';
-import { TickerComponent } from '../components/ticker';
-import { TILE_HINTS, tileHints } from '../components/tile-hints';
+import { StatusBarComponent } from '../components/status-bar';
+import { tileHints } from '../components/tile-hints';
 import { Api } from '../services/api';
 import { GameClient } from '../services/game-client';
 import { loadSeat } from '../services/seats';
@@ -37,36 +39,16 @@ import { loadSeat } from '../services/seats';
     ActionPanelComponent,
     AvatarPickerComponent,
     BoardComponent,
-    ChainTableComponent,
     ChatPanelComponent,
+    InfoTableComponent,
     LogPanelComponent,
-    PlayersPanelComponent,
     ResultsPanelComponent,
     RouterLink,
-    TickerComponent,
+    StatusBarComponent,
   ],
   providers: [GameClient],
   selector: 'app-game',
   styles: `
-    .hand button {
-      font-weight: 700;
-      min-width: 3rem;
-    }
-    .hand button.dead {
-      background: var(--danger);
-    }
-    .hand button.unplayable {
-      background: var(--muted);
-    }
-    .hand-note {
-      border-left: 3px solid var(--muted);
-      font-size: 0.9rem;
-      margin: 0.5rem 0;
-      padding-left: 0.5rem;
-    }
-    .hand-note.dead {
-      border-left-color: var(--danger);
-    }
     .lobby-players {
       list-style: none;
       padding: 0;
@@ -81,9 +63,10 @@ import { loadSeat } from '../services/seats';
       width: 100%;
     }
   `,
+  styleUrls: ['./frame.css'],
   template: `
     @if (!hasSeat) {
-      <section class="panel">
+      <section class="panel page">
         <p>You don't have a seat in this game.</p>
         <a [routerLink]="['/game', id(), 'board']"
           >Watch the board instead</a
@@ -91,177 +74,153 @@ import { loadSeat } from '../services/seats';
       </section>
     } @else if (client.lobby(); as lobby) {
       @if (!lobby.started) {
-        <section class="panel">
-          <h2>Lobby</h2>
-          <p class="muted">
-            {{
-              lobby.settings.mode === 'tycoon'
-                ? 'Tycoon'
-                : 'Classic'
-            }}
-            mode
-            {{
-              lobby.settings.secretHoldings
-                ? '· secret holdings'
-                : ''
-            }}
-          </p>
-          <ol class="lobby-players">
-            @for (p of lobby.players; track p.id) {
-              <li>
-                <span
-                  class="emoji lobby-avatar"
-                  aria-hidden="true"
-                  >{{ client.avatars().get(p.id) }}</span
-                >
-                {{ p.name }}
-                {{ p.id === lobby.hostPlayerId ? '(host)' : '' }}
-                {{ p.id === client.you() ? '(you)' : '' }}
-              </li>
-            }
-          </ol>
-          @if (client.you(); as you) {
-            <details>
-              <summary>Change your mascot</summary>
-              <app-avatar-picker
-                [value]="myAvatar()"
-                [taken]="takenAvatars()"
-                (valueChange)="
-                  $event && client.setAvatar($event)
-                "
-              />
-            </details>
-            @if (client.error(); as error) {
-              <p class="error">{{ error }}</p>
-            }
-          }
-          @if (isHost()) {
-            <div class="row">
-              <button
-                type="button"
-                class="secondary"
-                (click)="invite()"
-              >
-                {{
-                  inviteInfo() ? 'New invite' : 'Invite players'
-                }}
-              </button>
-              <button
-                type="button"
-                [disabled]="lobby.players.length < 2"
-                (click)="client.start()"
-              >
-                Start game
-              </button>
-            </div>
-            @if (inviteInfo(); as info) {
-              <div
-                class="row"
-                style="margin-top: 1rem; align-items: flex-start"
-              >
-                <img
-                  class="qr"
-                  alt="Invite QR code"
-                  [src]="qr()"
-                />
-                <div>
-                  <p>
-                    PIN:
-                    <strong style="font-size: 1.5rem">{{
-                      info.pin
-                    }}</strong>
-                  </p>
-                  <p class="muted">
-                    Expires at {{ expires(info.expiresAt) }}
-                  </p>
-                  <p><a [href]="info.url">Invite link</a></p>
-                </div>
-              </div>
-            }
-            @if (inviteError()) {
-              <p class="error">{{ inviteError() }}</p>
-            }
-          } @else {
-            <p class="muted">Waiting for the host to start…</p>
-          }
-        </section>
-        <section class="panel">
-          <h3>Table talk</h3>
-          <app-chat-panel
-            [messages]="client.chat()"
-            [names]="client.names()"
-            [avatars]="client.avatars()"
-            [canSend]="client.you() !== null"
-            [error]="client.chatError()"
-            (say)="client.say($event)"
-          />
-        </section>
-      } @else if (view(); as view) {
-        <div class="grid-2">
-          <div>
-            <section class="panel">
-              <app-board
-                [board]="view.board"
-                [hand]="handTiles()"
-                [hints]="hints()"
-                [selectable]="selectable()"
-                (tileClick)="
-                  client.send({
-                    tile: $event,
-                    type: 'placeTile',
-                  })
-                "
-              />
-            </section>
-            <section class="panel">
-              <h3>
-                Your tiles ·
-                <app-ticker
-                  format="currency"
-                  [value]="view.me.cash"
-                />
-              </h3>
-              <div class="row hand">
-                @for (t of view.me.hand; track t.tile) {
-                  <span [title]="tileHint[t.status]">
-                    <button
-                      type="button"
-                      [class]="t.status"
-                      [attr.aria-label]="
-                        t.tile + '. ' + tileHint[t.status]
-                      "
-                      [disabled]="!selectable().includes(t.tile)"
-                      (click)="
-                        client.send({
-                          tile: t.tile,
-                          type: 'placeTile',
-                        })
-                      "
-                    >
-                      {{ t.tile }}
-                    </button>
-                  </span>
-                }
-              </div>
-              @for (note of handNotes(); track note.status) {
-                <p class="hand-note" [class]="note.status">
-                  <strong>{{ note.tiles }}:</strong>
-                  {{ note.text }}
-                </p>
+        <div class="page">
+          <section class="panel">
+            <h2>Lobby</h2>
+            <p class="muted">
+              {{
+                lobby.settings.mode === 'tycoon'
+                  ? 'Tycoon'
+                  : 'Classic'
+              }}
+              mode
+              {{
+                lobby.settings.secretHoldings
+                  ? '· secret holdings'
+                  : ''
+              }}
+            </p>
+            <ol class="lobby-players">
+              @for (p of lobby.players; track p.id) {
+                <li>
+                  <span
+                    class="emoji lobby-avatar"
+                    aria-hidden="true"
+                    >{{ client.avatars().get(p.id) }}</span
+                  >
+                  {{ p.name }}
+                  {{
+                    p.id === lobby.hostPlayerId ? '(host)' : ''
+                  }}
+                  {{ p.id === client.you() ? '(you)' : '' }}
+                </li>
               }
-              <p class="muted">
-                {{ view.bagCount }} tiles left in the bag.
-                <a
-                  [routerLink]="['/game', id(), 'board']"
-                  target="_blank"
-                  >Open board view</a
+            </ol>
+            @if (client.you(); as you) {
+              <details>
+                <summary>Change your mascot</summary>
+                <app-avatar-picker
+                  [value]="myAvatar()"
+                  [taken]="takenAvatars()"
+                  (valueChange)="
+                    $event && client.setAvatar($event)
+                  "
+                />
+              </details>
+              @if (client.error(); as error) {
+                <p class="error">{{ error }}</p>
+              }
+            }
+            @if (isHost()) {
+              <div class="row">
+                <button
+                  type="button"
+                  class="secondary"
+                  (click)="invite()"
                 >
-              </p>
-            </section>
+                  {{
+                    inviteInfo()
+                      ? 'New invite'
+                      : 'Invite players'
+                  }}
+                </button>
+                <button
+                  type="button"
+                  [disabled]="lobby.players.length < 2"
+                  (click)="client.start()"
+                >
+                  Start game
+                </button>
+              </div>
+              @if (inviteInfo(); as info) {
+                <div
+                  class="row"
+                  style="margin-top: 1rem; align-items: flex-start"
+                >
+                  <img
+                    class="qr"
+                    alt="Invite QR code"
+                    [src]="qr()"
+                  />
+                  <div>
+                    <p>
+                      PIN:
+                      <strong style="font-size: 1.5rem">{{
+                        info.pin
+                      }}</strong>
+                    </p>
+                    <p class="muted">
+                      Expires at {{ expires(info.expiresAt) }}
+                    </p>
+                    <p><a [href]="info.url">Invite link</a></p>
+                  </div>
+                </div>
+              }
+              @if (inviteError()) {
+                <p class="error">{{ inviteError() }}</p>
+              }
+            } @else {
+              <p class="muted">Waiting for the host to start…</p>
+            }
+          </section>
+          <section class="panel">
+            <h3>Table talk</h3>
+            <app-chat-panel
+              [messages]="client.chat()"
+              [names]="client.names()"
+              [avatars]="client.avatars()"
+              [canSend]="client.you() !== null"
+              [error]="client.chatError()"
+              (say)="client.say($event)"
+            />
+          </section>
+        </div>
+      } @else if (view(); as view) {
+        <div class="frame" [class.my-turn]="myTurn()">
+          <div class="board-area">
+            <app-board
+              [board]="view.board"
+              [hand]="handTiles()"
+              [hints]="hints()"
+              [selectable]="selectable()"
+              (tileClick)="
+                client.send({
+                  tile: $event,
+                  type: 'placeTile',
+                })
+              "
+            />
           </div>
-          <div>
+          <app-status-bar
+            class="status"
+            [name]="myName()"
+            [avatar]="client.avatars().get(view.me.id)"
+            [cash]="view.me.cash"
+            [hand]="view.me.hand"
+            [bagCount]="view.bagCount"
+            [cue]="turnCue()"
+            [turn]="myTurn()"
+          >
+            <a
+              [routerLink]="['/game', id(), 'board']"
+              target="_blank"
+              >Board view</a
+            >
+          </app-status-bar>
+          <aside class="side">
             <section
-              class="panel"
+              #actions
+              class="panel actions"
               [class.attention]="myTurn()"
               [attr.aria-label]="myTurn() ? 'Your turn' : null"
             >
@@ -275,47 +234,44 @@ import { loadSeat } from '../services/seats';
                 <app-action-panel />
               }
             </section>
-            <section class="panel">
-              <app-chain-table
-                [chains]="view.chains"
-                [mine]="view.me.stock"
-              />
-            </section>
-            <section class="panel">
-              <app-players-panel
-                [gameMode]="gameMode()"
-                [players]="view.players"
-                [chains]="view.chains"
-                [active]="activePlayer()"
-                [avatars]="client.avatars()"
-                [you]="client.you()"
-              />
-            </section>
-            <section class="panel">
-              <h3>Log</h3>
-              <app-log-panel
-                [events]="client.log()"
-                [names]="client.names()"
-              />
-            </section>
-            <section class="panel">
-              <h3>Table talk</h3>
-              <app-chat-panel
-                [messages]="client.chat()"
-                [names]="client.names()"
-                [avatars]="client.avatars()"
-                [canSend]="client.you() !== null"
-                [error]="client.chatError()"
-                (say)="client.say($event)"
-              />
-            </section>
-          </div>
+            <div class="scroll">
+              <section class="panel">
+                <app-info-table
+                  [chains]="view.chains"
+                  [players]="view.players"
+                  [gameMode]="gameMode()"
+                  [active]="activePlayer()"
+                  [avatars]="client.avatars()"
+                  [you]="client.you()"
+                  [me]="view.me"
+                />
+              </section>
+              <section class="panel">
+                <h3>Log</h3>
+                <app-log-panel
+                  [events]="client.log()"
+                  [names]="client.names()"
+                />
+              </section>
+              <section class="panel">
+                <h3>Table talk</h3>
+                <app-chat-panel
+                  [messages]="client.chat()"
+                  [names]="client.names()"
+                  [avatars]="client.avatars()"
+                  [canSend]="client.you() !== null"
+                  [error]="client.chatError()"
+                  (say)="client.say($event)"
+                />
+              </section>
+            </div>
+          </aside>
         </div>
       }
     } @else if (client.error(); as error) {
-      <p class="error">{{ error }}</p>
+      <p class="error page">{{ error }}</p>
     } @else {
-      <p class="muted">Connecting…</p>
+      <p class="muted page">Connecting…</p>
     }
   `,
 })
@@ -333,19 +289,6 @@ export class GamePage implements OnInit {
   protected readonly view = computed(() => {
     const view = this.client.view();
     return view && 'me' in view ? (view as PlayerView) : null;
-  });
-  protected readonly handNotes = computed(() => {
-    const hand = this.view()?.me.hand ?? [];
-    return (['unplayable', 'dead'] as const)
-      .map((status) => ({
-        status,
-        text: TILE_HINTS[status],
-        tiles: hand
-          .filter((t) => t.status === status)
-          .map((t) => t.tile)
-          .join(', '),
-      }))
-      .filter((note) => note.tiles !== '');
   });
   protected readonly handTiles = computed(() =>
     (this.view()?.me.hand ?? []).map((t) => t.tile),
@@ -370,6 +313,10 @@ export class GamePage implements OnInit {
         .lobby()
         ?.players.find((p) => p.id === this.client.you())
         ?.avatar ?? null,
+  );
+  protected readonly myName = computed(
+    () =>
+      this.client.names().get(this.client.you() ?? '') ?? 'You',
   );
   /** True whenever this player owes the table a decision. */
   protected readonly myTurn = computed(() => {
@@ -404,8 +351,32 @@ export class GamePage implements OnInit {
   protected readonly takenAvatars = computed(() =>
     (this.client.lobby()?.players ?? []).map((p) => p.avatar),
   );
-  protected readonly tileHint = TILE_HINTS;
+  protected readonly turnCue = computed(() => {
+    if (this.view()?.results) return 'Game over';
+    if (this.myTurn()) return 'Your turn';
+    const active = this.activePlayer();
+    const name = active && this.client.names().get(active);
+    return name ? `Waiting for ${name}` : null;
+  });
+  private readonly actions =
+    viewChild<ElementRef<HTMLElement>>('actions');
   private readonly api = inject(Api);
+
+  constructor() {
+    // Small screens scroll the actions away; bring them back.
+    effect(() => {
+      const panel = this.actions()?.nativeElement;
+      if (!this.myTurn() || !panel?.scrollIntoView) return;
+      const still =
+        globalThis.matchMedia?.(
+          '(prefers-reduced-motion: reduce)',
+        ).matches ?? true;
+      panel.scrollIntoView({
+        behavior: still ? 'auto' : 'smooth',
+        block: 'nearest',
+      });
+    });
+  }
 
   ngOnInit(): void {
     this.hasSeat = loadSeat(this.id()) !== null;

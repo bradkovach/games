@@ -1,0 +1,106 @@
+/* Full-viewport game layout shared by player and board views. */
+:host {
+  display: block;
+  height: 100%;
+}
+/* Non-game states scroll like an ordinary page. */
+.page {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: 1rem max(1rem, calc((100% - 1200px) / 2));
+}
+section.page,
+p.page {
+  height: auto;
+  margin: 1rem;
+}
+.frame {
+  display: grid;
+  grid-template-areas:
+    'board side'
+    'status side';
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 33vw, 540px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+}
+.board-area {
+  container-type: size;
+  display: grid;
+  grid-area: board;
+  min-height: 0;
+  padding: 0.75rem;
+  place-items: center;
+}
+/* The largest 12×9 board of square tiles that fits. */
+app-board {
+  width: min(100cqw, 100cqh * 4 / 3);
+}
+.status {
+  grid-area: status;
+}
+.side {
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  grid-area: side;
+  min-height: 0;
+}
+/* Flat, full-bleed strips divided by hairlines. */
+.side .panel {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  margin: 0;
+}
+.side .panel.attention {
+  border: 2px solid transparent;
+}
+.actions {
+  flex: none;
+  max-height: 60%;
+  overflow-y: auto;
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+@media (max-width: 900px) {
+  .frame {
+    grid-template-areas:
+      'board'
+      'side'
+      'status';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .board-area {
+    border-bottom: 1px solid var(--line);
+    container-type: normal;
+    padding: 0.4rem;
+  }
+  app-board {
+    width: min(100%, 50dvh * 4 / 3);
+  }
+  /* One scroller holds the actions and every other panel. */
+  .side {
+    border-left: 0;
+    display: block;
+    overflow-y: auto;
+  }
+  .actions {
+    max-height: none;
+    overflow: visible;
+  }
+  .scroll {
+    overflow: visible;
+  }
+  .side .panel {
+    overflow-x: auto;
+    padding: 0.6rem 0.75rem;
+  }
+  .side .panel.attention {
+    padding: calc(0.6rem - 1px) calc(0.75rem - 1px);
+  }
+}

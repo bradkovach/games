@@ -226,6 +226,32 @@ describe('ActionPanelComponent', () => {
       ).toContain('you can declare the game over');
     });
 
+    it('says when no shares are for sale', async () => {
+      const { el } = await render();
+      view.set(makeView({ chains: [] }));
+      TestBed.tick();
+      expect(
+        el.querySelector('.no-shares')?.textContent,
+      ).toContain('There are no shares available for purchase.');
+      view.set(makeView());
+      TestBed.tick();
+      expect(el.querySelector('.no-shares')).toBeNull();
+    });
+
+    it('declaring the end while buying also finishes the turn', async () => {
+      const { el } = await render();
+      vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+      view.set(makeView({ canDeclareEnd: true }));
+      TestBed.tick();
+      el.querySelector<HTMLButtonElement>(
+        'button.secondary',
+      )!.click();
+      expect(sent).toEqual([
+        { type: 'declareEnd' },
+        { type: 'endTurn', discardDead: true, purchases: {} },
+      ]);
+    });
+
     it('can be cancelled for the current decision', async () => {
       const { el } = await render();
       TestBed.inject(PreferencesService).autoEndTurn.set(true);

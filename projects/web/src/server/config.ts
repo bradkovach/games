@@ -14,7 +14,9 @@ export interface ServerConfig {
 }
 
 export function loadConfig(): ServerConfig {
-  const secret = process.env['SESSION_SECRET'];
+  // Blank values (e.g. `KEY=` in compose) count as unset.
+  const secret =
+    process.env['SESSION_SECRET']?.trim() || undefined;
   if (!secret) {
     console.warn(
       'SESSION_SECRET is not set; sessions reset on restart.',
@@ -46,5 +48,5 @@ export function loadConfig(): ServerConfig {
 }
 
 function env(name: string, fallback: string): string {
-  return process.env[name] ?? fallback;
+  return process.env[name]?.trim() || fallback;
 }

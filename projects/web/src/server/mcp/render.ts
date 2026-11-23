@@ -158,7 +158,7 @@ export function renderMoves(moves: LegalMoves): string {
   }
   if (moves.declareEnd) {
     lines.push(
-      'declare_game_end: the end conditions are met; declaring ends the game after this turn',
+      'declare_game_end: the end conditions are met; declaring ends the game after this turn. Once your tile is placed it also buys (optional purchases) and ends your turn.',
     );
   }
   return lines.map((l) => `- ${l}`).join('\n');

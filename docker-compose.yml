@@ -2,7 +2,27 @@ services:
   dex:
     image: ghcr.io/dexidp/dex:v2.41.1
     command: ['dex', 'serve', '/etc/dex/config.yaml']
+    environment:
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-acquire-dev-secret}
     ports:
+      # Reverse proxy: auth.zombarista.io -> this port
       - '5556:5556'
     volumes:
       - ./dev/dex/config.yaml:/etc/dex/config.yaml:ro
+
+  acquire:
+    build: .
+    environment:
+      PUBLIC_URL: https://games.zombarista.io
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      OIDC_ISSUER: https://auth.zombarista.io
+      OIDC_CLIENT_ID: acquire
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-acquire-dev-secret}
+    ports:
+      # Reverse proxy: games.zombarista.io -> this port
+      - '4000:4000'
+    volumes:
+      - acquire-data:/data
+
+volumes:
+  acquire-data:

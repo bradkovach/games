@@ -190,6 +190,15 @@ npm run dex     # Dex OIDC on http://localhost:5556 (docker compose)
 npm start       # ng serve on :4200; game WebSockets on :4001
 ```
 
+`docker-compose.yml` is set up for the test deployment: the game is
+`https://games.zombarista.io` (proxy to port 4000) and Dex is
+`https://auth.zombarista.io` (proxy to port 5556). Set
+`OIDC_CLIENT_SECRET` and `SESSION_SECRET` in `.env`, then run
+`docker compose up -d --build`. Dex's issuer must match what the app
+uses, so for purely local development run `npm start` with
+`OIDC_ISSUER=https://auth.zombarista.io` against that Dex, or change
+`issuer` in `dev/dex/config.yaml` back to `http://localhost:5556/dex`.
+
 Sign in with the static Dex user `host@example.com` / `password`
 (configured in `dev/dex/config.yaml`). To use real identity
 providers, add Dex connectors (GitHub, Google, etc.) there.

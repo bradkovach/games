@@ -35,6 +35,15 @@ export const AUTO_END_DELAY_MS = 1500;
     .padding-0 {
       padding: 0;
     }
+    @media (max-width: 480px) {
+      table {
+        font-size: 0.85rem;
+      }
+      th,
+      td {
+        padding: 0.25rem 0.2rem;
+      }
+    }
 
     .figure {
       text-align: center;
@@ -231,6 +240,11 @@ export const AUTO_END_DELAY_MS = 1500;
         }
         @case ('buyStock') {
           <h3>Buy up to 3 shares</h3>
+          @if (!forSale()) {
+            <p class="muted no-shares">
+              There are no shares available for purchase.
+            </p>
+          }
           <table>
             <thead>
               <tr>
@@ -479,7 +493,6 @@ export class ActionPanelComponent {
       .filter((c) => !c.active)
       .map((c) => c.chain),
   );
-
   protected readonly canDeclare = computed(() => {
     const view = this.view();
     return !!view && view.canDeclareEnd && !view.endDeclared;
@@ -500,6 +513,7 @@ export class ActionPanelComponent {
       0,
     );
   });
+
   /**
    * Identifies the decision being made. Every server message builds
    * a new phase object, so the inputs reset on this string instead.
@@ -530,8 +544,8 @@ export class ActionPanelComponent {
       survivor: phase.survivor,
     };
   });
-
   protected readonly sell = signal(0);
+
   protected readonly trade = signal(0);
   protected readonly disposeValid = computed(() => {
     const d = this.dispose();
@@ -546,6 +560,12 @@ export class ActionPanelComponent {
       sell + trade <= d.owned
     );
   });
+  /** Whether any active chain has shares left in the bank. */
+  protected readonly forSale = computed(
+    () =>
+      this.view()?.chains.some((c) => c.active && c.bank > 0) ??
+      false,
+  );
   protected readonly names = CHAIN_NAMES;
   protected readonly waitingOn = computed(() => {
     const phase = this.client.view()?.phase;
@@ -613,9 +633,14 @@ export class ActionPanelComponent {
   }
 
   protected declare(): void {
-    if (confirm('Declare the end of the game?')) {
-      this.client.send({ type: 'declareEnd' });
-    }
+    const buying = this.myPhase()?.kind === 'buyStock';
+    const prompt = buying
+      ? 'Declare the end of the game and finish your turn with the shares selected?'
+      : 'Declare the end of the game?';
+    if (!confirm(prompt)) return;
+    this.client.send({ type: 'declareEnd' });
+    // The turn's buying step is the last one, so finish it too.
+    if (buying) this.endTurn();
   }
 
   protected endTurn(): void {

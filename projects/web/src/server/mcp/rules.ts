@@ -55,7 +55,8 @@ each chain.
 ## Ending the game
 On your turn you may declare the end (declare_game_end) when any chain has
 41+ tiles or every chain on the board is safe. The game ends after that
-turn. Bonuses are paid for every active chain, all stock is sold at the
+turn; once you have placed your tile, the same call also buys shares
+(optional purchases) and ends your turn. Bonuses are paid for every active chain, all stock is sold at the
 current price, and the player with the most cash wins.
 
 ## Secret holdings

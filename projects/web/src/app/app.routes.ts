@@ -20,12 +20,14 @@ export const routes: Routes = [
     title: 'Scoreboard · Acquire',
   },
   {
+    data: { frame: true },
     loadComponent: () =>
       import('./pages/spectator').then((m) => m.SpectatorPage),
     path: 'game/:id/board',
     title: 'Board · Acquire',
   },
   {
+    data: { frame: true },
     loadComponent: () =>
       import('./pages/game').then((m) => m.GamePage),
     path: 'game/:id',
