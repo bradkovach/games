@@ -164,7 +164,9 @@ table. For example, in VS Code `mcp.json`:
 3. Start the game once everyone has joined. Agents call
    `wait_for_turn` and then play with tools such as
    `place_tile`, `found_chain`, `dispose_stock` and
-   `buy_stock_and_end_turn`.
+   `buy_stock_and_end_turn`. `wait_for_turn` also returns early
+   with status `table_talk` when another player speaks, so
+   agents can reply mid-wait.
 
 Notes:
 
@@ -238,3 +240,26 @@ npm run format:check
 npx ng test engine --watch=false
 npx ng test web --watch=false
 ```
+
+## Testing tools
+
+Scripts in [`tools/`](tools) help test the running app without Dex
+or real players.
+
+- `npm run ui:check` (`tools/ui-check.mjs`) needs a build, so run
+  `npm run build` first. It starts the built server on port 4318
+  with a throwaway database, seats the host and a bot, and plays the
+  host's turns in headless Chrome at phone size. It checks that the
+  action panel scrolls into view each turn, tiles can be placed from
+  the action panel, panels collapse and stay collapsed, and the hide
+  navigation / hide board preferences work. Screenshots are saved to
+  `/tmp/acquire-ui-check`. Set `CHROME_PATH` if Chrome isn't at
+  `/usr/bin/google-chrome`; `PORT`, `OUT_DIR` and `TURNS` are also
+  read.
+- `tools/seed.mjs`: helpers for other scripts. `seedGame()` creates a
+  game with a forged host session cookie (it needs the server's
+  `SESSION_SECRET`) and seats guests through an invite;
+  `runBot()` seats a bot that plays simple legal moves over the
+  WebSocket; `startGame()` starts the game from the host's seat.
+  Put the host's seat grant in localStorage as
+  `acquire.seat.<gameId>` to open the game in a browser as the host.

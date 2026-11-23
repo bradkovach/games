@@ -170,30 +170,15 @@ export function renderPhase(
   who: (id: string) => string,
 ): string {
   const { phase } = view;
-  const actor =
-    'playerId' in phase
-      ? phase.playerId === view.me.id
-        ? 'You'
-        : who(phase.playerId)
-      : '';
-  switch (phase.kind) {
-    case 'buyStock':
-      return `${actor}: buy up to 3 shares, then end the turn`;
-    case 'chooseAcquired':
-      return `${actor}: choose which chain is acquired next`;
-    case 'chooseSurvivor':
-      return `${actor}: choose the surviving chain of a tied merger`;
-    case 'disposeStock':
-      return `${actor}: sell, trade or keep ${chainName(phase.acquired)} stock (merging into ${chainName(phase.survivor)})`;
-    case 'foundChain':
-      return `${actor}: choose a hotel chain to found at ${phase.tile}`;
-    case 'gameOver':
-      return 'The game is over';
-    case 'notStarted':
-      return 'The game has not started';
-    case 'placeTile':
-      return `${actor}: place a tile`;
+  if (!('playerId' in phase)) {
+    return phase.kind === 'gameOver'
+      ? 'The game is over'
+      : 'The game has not started';
   }
+  const mine = phase.playerId === view.me.id;
+  const actor = mine ? 'You' : who(phase.playerId);
+  const text = describePhase(phase, actor, who, view.me.id);
+  return mine ? text : `Not your turn. Waiting for ${text}`;
 }
 
 /** The full text an agent reads after every tool call. */
@@ -251,13 +236,17 @@ export function renderSnapshot(snapshot: Snapshot): string {
     out.push('```');
     out.push('');
     out.push('## Chains');
-    out.push('| Chain | Size | Price | Bank | Safe | You own |');
+    out.push(
+      '| Chain | Size | Price | Bank | Status | You own |',
+    );
     out.push('|---|---|---|---|---|---|');
     for (const c of view.chains) {
       out.push(
-        `| ${c.chain} | ${c.active ? c.size : '-'} | ${c.active ? money(c.price) : '-'} | ${c.bank} | ${c.safe ? 'yes' : ''} | ${me.stock[c.chain] ?? 0} |`,
+        `| ${c.chain} | ${c.active ? c.size : '-'} | ${c.active ? money(c.price) : '-'} | ${c.bank} | ${chainStatus(view, c)} | ${me.stock[c.chain] ?? 0} |`,
       );
     }
+    const merger = mergerNote(view);
+    if (merger) out.push(merger);
     out.push('');
     out.push('## Players (turn order)');
     for (const p of view.players) {
@@ -306,6 +295,58 @@ export function renderSnapshot(snapshot: Snapshot): string {
     }
   }
   return out.join('\n');
+}
+
+/** Safe, or its part in a merger that is still being settled. */
+function chainStatus(
+  view: PlayerView,
+  c: PlayerView['chains'][number],
+): string {
+  const { phase } = view;
+  if (phase.kind === 'disposeStock') {
+    if (c.chain === phase.acquired) {
+      return `being acquired by ${chainName(phase.survivor)}`;
+    }
+    if (phase.remaining.includes(c.chain)) {
+      return `acquired next by ${chainName(phase.survivor)}`;
+    }
+    if (c.chain === phase.survivor) return 'surviving merger';
+  }
+  if (!c.active) return 'not on the board';
+  return c.safe ? 'safe' : '';
+}
+
+function describePhase(
+  phase: Extract<PlayerView['phase'], { playerId: string }>,
+  actor: string,
+  who: (id: string) => string,
+  me: string,
+): string {
+  switch (phase.kind) {
+    case 'buyStock':
+      return `${actor}: buy up to 3 shares, then end the turn`;
+    case 'chooseAcquired':
+      return `${actor}: choose which chain is acquired next`;
+    case 'chooseSurvivor':
+      return `${actor}: choose the surviving chain of a tied merger`;
+    case 'disposeStock': {
+      const maker =
+        phase.mergemaker === me
+          ? 'your'
+          : `${who(phase.mergemaker)}'s`;
+      return `${actor}: sell, trade or keep ${chainName(phase.acquired)} stock (${chainName(phase.acquired)} is being acquired by ${chainName(phase.survivor)} in ${maker} merger)`;
+    }
+    case 'foundChain':
+      return `${actor}: choose a hotel chain to found at ${phase.tile}`;
+    case 'placeTile':
+      return `${actor}: place a tile`;
+  }
+}
+
+function mergerNote(view: PlayerView): null | string {
+  const { phase } = view;
+  if (phase.kind !== 'disposeStock') return null;
+  return `Merger in progress: ${chainName(phase.acquired)} stays listed with its size and price until every shareholder has sold, traded or kept their shares; then its tiles join ${chainName(phase.survivor)}.`;
 }
 
 function noBuyReason(cash: number, anyActive: boolean): string {

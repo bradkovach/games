@@ -10,6 +10,7 @@ import {
 } from '@angular/router';
 import { filter, map } from 'rxjs';
 
+import { PreferencesService } from './services/preferences';
 import {
   type ThemePreference,
   ThemeService,
@@ -31,6 +32,7 @@ export class App {
     ),
     { initialValue: false },
   );
+  protected readonly prefs = inject(PreferencesService);
   protected readonly theme = inject(ThemeService);
 
   protected setTheme(event: Event): void {

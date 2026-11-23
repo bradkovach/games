@@ -33,6 +33,7 @@ const StatusSchema = z.enum([
   'game_over',
   'game_started',
   'lobby',
+  'table_talk',
   'waiting',
   'your_turn',
 ]);
@@ -97,6 +98,7 @@ export function createAgentServer(
   ): CallToolResult => {
     const { lobby, view } = seat;
     session.shownStarted = seat.lobby?.started ?? false;
+    const shown = extra.status ?? status(seat);
     const news = seat.takeNews();
     const moves = view ? legalMoves(view) : null;
     const nameMap = names(lobby);
@@ -119,7 +121,7 @@ export function createAgentServer(
       phase: view?.phase.kind ?? 'notStarted',
       playerId: seat.playerId,
       seatToken: extra.seatToken,
-      status: extra.status ?? status(seat),
+      status: shown,
       view: view as null | Record<string, unknown>,
     };
     return {
@@ -128,7 +130,8 @@ export function createAgentServer(
           type: 'text',
           text: [
             extra.prefix,
-            `Status: ${structured.status}`,
+            `Status: ${shown}`,
+            STATUS_HINTS[shown],
             text,
           ]
             .filter(Boolean)
@@ -171,7 +174,7 @@ export function createAgentServer(
     });
     if (!outcome.ok) {
       const result = report(seat, {
-        prefix: `That move was rejected: ${outcome.error}`,
+        prefix: `That move was rejected: ${outcome.error}${rejectionHint(seat)}`,
       });
       return { content: result.content, isError: true };
     }
@@ -351,7 +354,7 @@ export function createAgentServer(
     'wait_for_turn',
     {
       annotations: { readOnlyHint: true },
-      description: `Wait until you must act (status your_turn), the game starts (game_started) or ends (game_over). Returns status "waiting" after the timeout; just call it again. Also returns what other players did meanwhile.`,
+      description: `Wait until you must act (status your_turn), the game starts (game_started) or ends (game_over), or another player says something (table_talk: reply with say if you like, then wait again). Returns status "waiting" after the timeout; just call it again. Also returns what other players did meanwhile.`,
       inputSchema: {
         timeoutSeconds: z
           .number()
@@ -378,6 +381,10 @@ export function createAgentServer(
           }
           if (!session.shownStarted && seat.lobby?.started) {
             result = 'game_started';
+            return true;
+          }
+          if (seat.hasFreshTalk()) {
+            result = 'table_talk';
             return true;
           }
           return false;
@@ -540,6 +547,20 @@ export function createAgentServer(
   return server;
 }
 
+/** What to do next, by status; shown under the status line. */
+const STATUS_HINTS: Record<Status, string> = {
+  game_over: 'The game is over. Final results are below.',
+  game_started:
+    'The game has started, but it is not your turn yet. Call wait_for_turn.',
+  lobby: '',
+  table_talk:
+    'Someone spoke at the table (see "Table talk" below). It is not your turn. Reply with say if you like, then call wait_for_turn.',
+  waiting:
+    'It is not your turn. Call wait_for_turn again; do not call action tools until the status is your_turn.',
+  your_turn:
+    'It is your turn. Call exactly one tool from "Your options".',
+};
+
 /** Accepts a full invite link, a bare token or a PIN. */
 export function inviteCode(invite: string): string {
   const trimmed = invite.trim();
@@ -550,6 +571,20 @@ export function inviteCode(invite: string): string {
     // Not a URL: a PIN or a raw token.
   }
   return trimmed;
+}
+
+/** Explains a rejection caused by acting out of turn. */
+function rejectionHint(seat: AgentSeat): string {
+  const view = seat.view;
+  if (!view) return '';
+  const { phase } = view;
+  if (!('playerId' in phase) || phase.playerId === view.me.id) {
+    return '';
+  }
+  const name =
+    seat.lobby?.players.find((p) => p.id === phase.playerId)
+      ?.name ?? 'another player';
+  return ` It is ${name}'s decision now, not yours; call wait_for_turn and act only when its status is your_turn.`;
 }
 
 function resolveAvatar(value: string): string | undefined {

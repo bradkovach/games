@@ -127,6 +127,96 @@ describe('ActionPanelComponent', () => {
     );
   });
 
+  it('places a tile from the hand buttons', async () => {
+    const { el, fixture } = await render();
+    view.set(
+      makeView({
+        me: {
+          id: 'a',
+          cash: 6000,
+          hand: [
+            { status: 'playable', tile: '1A' },
+            { status: 'dead', tile: '5C' },
+          ],
+          stock: { ...STOCK },
+        },
+        phase: { kind: 'placeTile', playerId: 'a' },
+      }),
+    );
+    await fixture.whenStable();
+    const [playable, dead] =
+      el.querySelectorAll<HTMLButtonElement>('.hand button');
+    expect(dead.disabled).toBe(true);
+    expect(dead.title).toContain('Dead');
+    playable.click();
+    expect(sent).toEqual([{ type: 'placeTile', tile: '1A' }]);
+  });
+
+  it('limits the dispose steppers to the shares held', async () => {
+    const { el, fixture } = await render();
+    view.set(
+      makeView({
+        chains: [
+          {
+            active: true,
+            bank: 1,
+            chain: 'tower',
+            price: 300,
+            safe: false,
+            size: 8,
+          },
+          {
+            active: false,
+            bank: 22,
+            chain: 'sackson',
+            price: 400,
+            safe: false,
+            size: 0,
+          },
+        ],
+        me: {
+          id: 'a',
+          cash: 6000,
+          hand: [],
+          stock: { ...STOCK, sackson: 5 },
+        },
+        phase: {
+          acquired: 'sackson',
+          kind: 'disposeStock',
+          mergemaker: 'a',
+          playerId: 'a',
+          queue: [],
+          remaining: [],
+          survivor: 'tower',
+          tile: '6D',
+        },
+      }),
+    );
+    await fixture.whenStable();
+    const button = (label: string) =>
+      el.querySelector<HTMLButtonElement>(
+        `button[aria-label="${label}"]`,
+      )!;
+    // The survivor's bank holds 1 share, so at most 2 trade in.
+    button('Trade two more').click();
+    await fixture.whenStable();
+    expect(button('Trade two more').disabled).toBe(true);
+    for (let i = 0; i < 3; i++) {
+      button('Sell one more').click();
+      await fixture.whenStable();
+    }
+    expect(button('Sell one more').disabled).toBe(true);
+    expect(el.querySelector('.keep')?.textContent?.trim()).toBe(
+      '0',
+    );
+    el.querySelector<HTMLButtonElement>(
+      'p button:not(.secondary)',
+    )!.click();
+    expect(sent).toEqual([
+      { type: 'disposeStock', sell: 3, trade: 2 },
+    ]);
+  });
+
   describe('auto-end', () => {
     // Fake timers stall whenStable, so flush with TestBed.tick().
     beforeEach(() => vi.useFakeTimers());
@@ -268,9 +358,12 @@ describe('ActionPanelComponent', () => {
       expect(el.textContent).not.toContain('ending your turn');
     });
 
-    it('stays off unless the player opts in', async () => {
+    it('is on by default and stays off once opted out', async () => {
       const { el } = await render();
-      view.set(makeView({ canDeclareEnd: true, cash: 0 }));
+      const prefs = TestBed.inject(PreferencesService);
+      expect(prefs.autoEndTurn()).toBe(true);
+      prefs.autoEndTurn.set(false);
+      view.set(makeView({ cash: 0 }));
       TestBed.tick();
       vi.advanceTimersByTime(AUTO_END_DELAY_MS * 2);
       expect(sent).toEqual([]);

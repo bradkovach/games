@@ -104,3 +104,25 @@ app-board {
     padding: calc(0.6rem - 1px) calc(0.75rem - 1px);
   }
 }
+/* Board hidden: a shared screen shows it, so panels take over. */
+.frame.no-board {
+  grid-template-areas:
+    'side'
+    'status';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.no-board .side {
+  border-left: 0;
+}
+@media (min-width: 901px) {
+  .no-board .side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .no-board .actions {
+    border-right: 1px solid var(--line);
+    max-height: none;
+  }
+}

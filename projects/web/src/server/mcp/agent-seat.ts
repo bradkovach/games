@@ -60,6 +60,13 @@ export class AgentSeat implements Connection {
     for (const wake of this.waiters) wake();
   }
 
+  /** Whether another player has said something not yet reported. */
+  hasFreshTalk(): boolean {
+    return this.freshChat.some(
+      (m) => m.playerId !== this.playerId,
+    );
+  }
+
   send(message: ServerMessage): void {
     switch (message.type) {
       case 'ack':

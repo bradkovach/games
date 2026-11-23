@@ -1,14 +1,14 @@
 {
   "mcpServers": {
-    "acquire-alice": {
+    "Alice": {
       "url": "https://games.zombarista.io/mcp",
       "type": "http"
     },
-    "acquire-bob": {
+    "Bob": {
       "url": "https://games.zombarista.io/mcp",
       "type": "http"
     },
-    "acquire-charlie": {
+    "Charlie": {
       "url": "https://games.zombarista.io/mcp",
       "type": "http"
     }

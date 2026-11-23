@@ -1,12 +1,14 @@
 import type { PlayerView } from 'engine';
 
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
   effect,
   ElementRef,
   inject,
+  Injector,
   input,
   type OnInit,
   signal,
@@ -26,11 +28,14 @@ import { BoardComponent } from '../components/board';
 import { ChatPanelComponent } from '../components/chat-panel';
 import { InfoTableComponent } from '../components/info-table';
 import { LogPanelComponent } from '../components/log-panel';
+import { PanelComponent } from '../components/panel';
+import { PreferencesPanelComponent } from '../components/preferences-panel';
 import { ResultsPanelComponent } from '../components/results-panel';
 import { StatusBarComponent } from '../components/status-bar';
 import { tileHints } from '../components/tile-hints';
 import { Api } from '../services/api';
 import { GameClient } from '../services/game-client';
+import { PreferencesService } from '../services/preferences';
 import { loadSeat } from '../services/seats';
 
 @Component({
@@ -42,6 +47,8 @@ import { loadSeat } from '../services/seats';
     ChatPanelComponent,
     InfoTableComponent,
     LogPanelComponent,
+    PanelComponent,
+    PreferencesPanelComponent,
     ResultsPanelComponent,
     RouterLink,
     StatusBarComponent,
@@ -186,21 +193,27 @@ import { loadSeat } from '../services/seats';
           </section>
         </div>
       } @else if (view(); as view) {
-        <div class="frame" [class.my-turn]="myTurn()">
-          <div class="board-area">
-            <app-board
-              [board]="view.board"
-              [hand]="handTiles()"
-              [hints]="hints()"
-              [selectable]="selectable()"
-              (tileClick)="
-                client.send({
-                  tile: $event,
-                  type: 'placeTile',
-                })
-              "
-            />
-          </div>
+        <div
+          class="frame"
+          [class.my-turn]="myTurn()"
+          [class.no-board]="prefs.hideBoard()"
+        >
+          @if (!prefs.hideBoard()) {
+            <div class="board-area">
+              <app-board
+                [board]="view.board"
+                [hand]="handTiles()"
+                [hints]="hints()"
+                [selectable]="selectable()"
+                (tileClick)="
+                  client.send({
+                    tile: $event,
+                    type: 'placeTile',
+                  })
+                "
+              />
+            </div>
+          }
           <app-status-bar
             class="status"
             [name]="myName()"
@@ -246,15 +259,13 @@ import { loadSeat } from '../services/seats';
                   [me]="view.me"
                 />
               </section>
-              <section class="panel">
-                <h3>Log</h3>
+              <app-panel key="log" heading="Log">
                 <app-log-panel
                   [events]="client.log()"
                   [names]="client.names()"
                 />
-              </section>
-              <section class="panel">
-                <h3>Table talk</h3>
+              </app-panel>
+              <app-panel key="chat" heading="Table talk">
                 <app-chat-panel
                   [messages]="client.chat()"
                   [names]="client.names()"
@@ -263,7 +274,10 @@ import { loadSeat } from '../services/seats';
                   [error]="client.chatError()"
                   (say)="client.say($event)"
                 />
-              </section>
+              </app-panel>
+              <app-panel key="prefs" heading="Preferences">
+                <app-preferences-panel [player]="true" />
+              </app-panel>
             </div>
           </aside>
         </div>
@@ -325,6 +339,7 @@ export class GamePage implements OnInit {
     const { phase } = view;
     return 'playerId' in phase && phase.playerId === view.me.id;
   });
+  protected readonly prefs = inject(PreferencesService);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly qr = computed<null | SafeUrl>(() => {
     const info = this.inviteInfo();
@@ -361,19 +376,21 @@ export class GamePage implements OnInit {
   private readonly actions =
     viewChild<ElementRef<HTMLElement>>('actions');
   private readonly api = inject(Api);
+  /** Changes with each decision this player is asked to make. */
+  private readonly decision = computed(() => {
+    const view = this.view();
+    if (!view || !this.myTurn()) return null;
+    return `${view.phase.kind}:${this.client.log().length}`;
+  });
+  private readonly injector = inject(Injector);
 
   constructor() {
-    // Small screens scroll the actions away; bring them back.
+    // Small screens scroll the actions away; bring them back once
+    // the panel has rendered the new decision.
     effect(() => {
-      const panel = this.actions()?.nativeElement;
-      if (!this.myTurn() || !panel?.scrollIntoView) return;
-      const still =
-        globalThis.matchMedia?.(
-          '(prefers-reduced-motion: reduce)',
-        ).matches ?? true;
-      panel.scrollIntoView({
-        behavior: still ? 'auto' : 'smooth',
-        block: 'nearest',
+      if (!this.decision()) return;
+      afterNextRender(() => this.revealActions(), {
+        injector: this.injector,
       });
     });
   }
@@ -400,4 +417,23 @@ export class GamePage implements OnInit {
 
   protected readonly nameOf = (id: string) =>
     this.client.names().get(id) ?? id;
+
+  /** Scrolls the side column so the action panel's top shows. */
+  private revealActions(): void {
+    const panel = this.actions()?.nativeElement;
+    const scroller = panel?.closest<HTMLElement>('.side');
+    if (!panel || !scroller?.scrollTo) return;
+    if (scroller.scrollHeight <= scroller.clientHeight) return;
+    const offset =
+      panel.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top;
+    if (Math.abs(offset) < 2) return;
+    const still =
+      globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')
+        .matches ?? true;
+    scroller.scrollTo({
+      behavior: still ? 'auto' : 'smooth',
+      top: scroller.scrollTop + offset,
+    });
+  }
 }

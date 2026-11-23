@@ -1,28 +1,30 @@
-<header class="topbar">
-  <a class="brand" routerLink="/">Acquire</a>
-  <nav>
-    <a
-      routerLink="/"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-      >Play</a
-    >
-    <a routerLink="/scoreboard" routerLinkActive="active"
-      >Scoreboard</a
-    >
-  </nav>
-  <label class="theme">
-    <span class="visually-hidden">Colour theme</span>
-    <select
-      [value]="theme.preference()"
-      (change)="setTheme($event)"
-    >
-      <option value="system">System theme</option>
-      <option value="light">Light</option>
-      <option value="dark">Dark</option>
-    </select>
-  </label>
-</header>
+@if (!(frame() && prefs.hideNav())) {
+  <header class="topbar">
+    <a class="brand" routerLink="/">Acquire</a>
+    <nav>
+      <a
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        >Play</a
+      >
+      <a routerLink="/scoreboard" routerLinkActive="active"
+        >Scoreboard</a
+      >
+    </nav>
+    <label class="theme">
+      <span class="visually-hidden">Colour theme</span>
+      <select
+        [value]="theme.preference()"
+        (change)="setTheme($event)"
+      >
+        <option value="system">System theme</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+  </header>
+}
 <main [class.frame]="frame()">
   <router-outlet />
 </main>

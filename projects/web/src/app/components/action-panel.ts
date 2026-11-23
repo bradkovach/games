@@ -17,6 +17,7 @@ import {
 import { GameClient } from '../services/game-client';
 import { PreferencesService } from '../services/preferences';
 import { TickerComponent } from './ticker';
+import { TILE_HINTS } from './tile-hints';
 
 /** Time to cancel before an automatic end of turn. */
 export const AUTO_END_DELAY_MS = 1500;
@@ -97,10 +98,26 @@ export const AUTO_END_DELAY_MS = 1500;
       display: flex;
       gap: 0.5rem;
     }
-    .auto-pref {
-      display: block;
-      font-size: 0.85rem;
-      margin-top: 0.75rem;
+    .hand {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin: 0.5rem 0;
+    }
+    .tile {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      min-width: 3rem;
+      padding: 0.45rem 0.5rem;
+    }
+    .tile.unplayable {
+      border-style: dashed;
+    }
+    .tile.dead {
+      text-decoration: line-through;
+    }
+    .dispose .actions {
+      min-width: 7rem;
     }
 
     tfoot td,
@@ -114,8 +131,35 @@ export const AUTO_END_DELAY_MS = 1500;
         @case ('placeTile') {
           <h3>Your turn: place a tile</h3>
           <p class="muted">
-            Click a highlighted tile on the board.
+            {{
+              prefs.hideBoard()
+                ? 'Choose a tile to place.'
+                : 'Choose a tile, or click a highlighted tile on the board.'
+            }}
           </p>
+          <div class="hand" role="group" aria-label="Your tiles">
+            @for (t of view.me.hand; track t.tile) {
+              <button
+                type="button"
+                class="tile {{ t.status }}"
+                [disabled]="t.status !== 'playable'"
+                [title]="hints[t.status]"
+                [attr.aria-label]="
+                  t.status === 'playable'
+                    ? 'Place ' + t.tile
+                    : t.tile + '. ' + hints[t.status]
+                "
+                (click)="
+                  client.send({
+                    tile: t.tile,
+                    type: 'placeTile',
+                  })
+                "
+              >
+                {{ t.tile }}
+              </button>
+            }
+          </div>
           <div class="row">
             @if (!hasPlayable()) {
               <button
@@ -203,30 +247,90 @@ export const AUTO_END_DELAY_MS = 1500;
               each). Trades are 2 {{ names[d.acquired] }} → 1
               {{ names[d.survivor] }}.
             </p>
-            <div class="row">
-              <label
-                >Sell
-                <input
-                  type="number"
-                  min="0"
-                  [max]="d.owned"
-                  [value]="sell()"
-                  (input)="sell.set(num($event))"
-              /></label>
-              <label
-                >Trade
-                <input
-                  type="number"
-                  min="0"
-                  step="2"
-                  [max]="d.maxTrade"
-                  [value]="trade()"
-                  (input)="trade.set(num($event))"
-              /></label>
-              <span class="muted"
-                >Keep {{ d.owned - sell() - trade() }}</span
-              >
-            </div>
+            <table class="dispose">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th class="figure">Shares</th>
+                  <th class="num">You get</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Sell</th>
+                  <td class="padding-0 actions">
+                    <button
+                      type="button"
+                      class="actions__action"
+                      aria-label="Sell one fewer"
+                      [disabled]="sell() === 0"
+                      (click)="sell.set(sell() - 1)"
+                    >
+                      −
+                    </button>
+                    <span
+                      class="actions__text actions__text--numeric"
+                      >{{ sell() }}</span
+                    >
+                    <button
+                      type="button"
+                      class="actions__action"
+                      aria-label="Sell one more"
+                      [disabled]="sell() + trade() >= d.owned"
+                      (click)="sell.set(sell() + 1)"
+                    >
+                      +
+                    </button>
+                  </td>
+                  <td class="num">
+                    \${{ sell() * d.price | number: '1.0-0' }}
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Trade</th>
+                  <td class="padding-0 actions">
+                    <button
+                      type="button"
+                      class="actions__action"
+                      aria-label="Trade two fewer"
+                      [disabled]="trade() === 0"
+                      (click)="trade.set(trade() - 2)"
+                    >
+                      −
+                    </button>
+                    <span
+                      class="actions__text actions__text--numeric"
+                      >{{ trade() }}</span
+                    >
+                    <button
+                      type="button"
+                      class="actions__action"
+                      aria-label="Trade two more"
+                      [disabled]="
+                        trade() + 2 > d.maxTrade ||
+                        sell() + trade() + 2 > d.owned
+                      "
+                      (click)="trade.set(trade() + 2)"
+                    >
+                      +
+                    </button>
+                  </td>
+                  <td class="num">
+                    {{ trade() / 2 }}
+                    <span class="chain chain-{{ d.survivor }}">{{
+                      names[d.survivor]
+                    }}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Keep</th>
+                  <td class="figure keep">
+                    {{ d.owned - sell() - trade() }}
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
             <p>
               <button
                 type="button"
@@ -398,18 +502,6 @@ export const AUTO_END_DELAY_MS = 1500;
       @if (client.error(); as error) {
         <p class="error">{{ error }}</p>
       }
-      @if (view.phase.kind !== 'gameOver') {
-        <label class="muted auto-pref"
-          ><input
-            type="checkbox"
-            [checked]="prefs.autoEndTurn()"
-            (change)="
-              prefs.autoEndTurn.set(!prefs.autoEndTurn())
-            "
-          />
-          Automatically end my turn when I have no moves</label
-        >
-      }
     }
   `,
 })
@@ -566,6 +658,7 @@ export class ActionPanelComponent {
       this.view()?.chains.some((c) => c.active && c.bank > 0) ??
       false,
   );
+  protected readonly hints = TILE_HINTS;
   protected readonly names = CHAIN_NAMES;
   protected readonly waitingOn = computed(() => {
     const phase = this.client.view()?.phase;
@@ -649,15 +742,6 @@ export class ActionPanelComponent {
       discardDead: this.discard(),
       purchases: this.buys(),
     });
-  }
-
-  protected num(event: Event): number {
-    return Math.max(
-      0,
-      Math.floor(
-        Number((event.target as HTMLInputElement).value) || 0,
-      ),
-    );
   }
 
   protected submitDispose(): void {

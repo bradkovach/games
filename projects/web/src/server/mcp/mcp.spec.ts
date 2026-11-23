@@ -284,6 +284,25 @@ describe('MCP endpoint', () => {
     });
     expect(rejected.error).toBe(true);
     expect(rejected.text).toMatch(/That move was rejected: /);
+    expect(rejected.text).toMatch(/decision now, not yours/);
+    expect(rejected.text).toMatch(
+      /# Not your turn\. Waiting for /,
+    );
+
+    // Table talk wakes a waiting agent so it can reply.
+    const waiting = call(idle, 'wait_for_turn', {
+      timeoutSeconds: 5,
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    socket.send(
+      JSON.stringify({ type: 'chat', id: 'hi', text: 'Hello?' }),
+    );
+    const woke = await waiting;
+    expect(woke.structured.status).toBe('table_talk');
+    expect(woke.structured.chat).toContainEqual({
+      from: 'Host',
+      text: 'Hello?',
+    });
 
     const resumed = await agent();
     const back = await call(resumed, 'resume_seat', {
