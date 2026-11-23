@@ -9,6 +9,7 @@ import {
 
 import { BoardComponent } from '../components/board';
 import { ChainTableComponent } from '../components/chain-table';
+import { ChatPanelComponent } from '../components/chat-panel';
 import { LogPanelComponent } from '../components/log-panel';
 import { PlayersPanelComponent } from '../components/players-panel';
 import { ResultsPanelComponent } from '../components/results-panel';
@@ -20,6 +21,7 @@ import { GameClient } from '../services/game-client';
   imports: [
     BoardComponent,
     ChainTableComponent,
+    ChatPanelComponent,
     LogPanelComponent,
     PlayersPanelComponent,
     ResultsPanelComponent,
@@ -66,6 +68,16 @@ import { GameClient } from '../services/game-client';
               [names]="client.names()"
             />
           </section>
+          @if (client.chat().length > 0) {
+            <section class="panel">
+              <h3>Table talk</h3>
+              <app-chat-panel
+                [messages]="client.chat()"
+                [names]="client.names()"
+                [avatars]="client.avatars()"
+              />
+            </section>
+          }
         </div>
       </div>
     } @else if (client.lobby(); as lobby) {

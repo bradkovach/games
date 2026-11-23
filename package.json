@@ -29,6 +29,7 @@
     "@fastify/static": "^10.1.12",
     "@fastify/websocket": "^11.3.7",
     "@fontsource/noto-emoji": "^5.3.2",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "better-sqlite3": "^13.2.0",
     "fastify": "^5.12.8",
     "openid-client": "^6.9.1",

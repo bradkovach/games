@@ -21,6 +21,7 @@ import { ActionPanelComponent } from '../components/action-panel';
 import { AvatarPickerComponent } from '../components/avatar-picker';
 import { BoardComponent } from '../components/board';
 import { ChainTableComponent } from '../components/chain-table';
+import { ChatPanelComponent } from '../components/chat-panel';
 import { LogPanelComponent } from '../components/log-panel';
 import { PlayersPanelComponent } from '../components/players-panel';
 import { ResultsPanelComponent } from '../components/results-panel';
@@ -37,6 +38,7 @@ import { loadSeat } from '../services/seats';
     AvatarPickerComponent,
     BoardComponent,
     ChainTableComponent,
+    ChatPanelComponent,
     LogPanelComponent,
     PlayersPanelComponent,
     ResultsPanelComponent,
@@ -183,6 +185,17 @@ import { loadSeat } from '../services/seats';
             <p class="muted">Waiting for the host to start…</p>
           }
         </section>
+        <section class="panel">
+          <h3>Table talk</h3>
+          <app-chat-panel
+            [messages]="client.chat()"
+            [names]="client.names()"
+            [avatars]="client.avatars()"
+            [canSend]="client.you() !== null"
+            [error]="client.chatError()"
+            (say)="client.say($event)"
+          />
+        </section>
       } @else if (view(); as view) {
         <div class="grid-2">
           <div>
@@ -283,6 +296,17 @@ import { loadSeat } from '../services/seats';
               <app-log-panel
                 [events]="client.log()"
                 [names]="client.names()"
+              />
+            </section>
+            <section class="panel">
+              <h3>Table talk</h3>
+              <app-chat-panel
+                [messages]="client.chat()"
+                [names]="client.names()"
+                [avatars]="client.avatars()"
+                [canSend]="client.you() !== null"
+                [error]="client.chatError()"
+                (say)="client.say($event)"
               />
             </section>
           </div>

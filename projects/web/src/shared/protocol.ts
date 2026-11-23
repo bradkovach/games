@@ -12,7 +12,14 @@ const AvatarSchema = z
   .string()
   .refine(isAvatar, { message: 'Unknown avatar' });
 
+export const CHAT_MAX = 200;
+
 export const ClientMessageSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('chat'),
+    id: z.string().max(64),
+    text: z.string().trim().min(1).max(CHAT_MAX),
+  }),
   z.object({
     type: z.literal('command'),
     id: z.string().max(64),
@@ -33,6 +40,13 @@ export type ActionMessage = Exclude<
   ClientMessage,
   { type: 'hello' }
 >;
+/** Table talk; kept apart from the game's event log. */
+export interface ChatMessage {
+  at: number;
+  playerId: string;
+  text: string;
+}
+
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
 export interface LobbyInfo {
@@ -54,7 +68,8 @@ export type ServerMessage =
     }
   | { id: string; message: string; type: 'error' }
   | { id: string; type: 'ack' }
-  | { lobby: LobbyInfo; type: 'lobby' };
+  | { lobby: LobbyInfo; type: 'lobby' }
+  | { messages: ChatMessage[]; type: 'chat' };
 
 export const JoinRequestSchema = z.object({
   avatar: AvatarSchema.optional(),

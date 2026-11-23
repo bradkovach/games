@@ -130,6 +130,57 @@ reports health at `/api/health`. All settings are listed under
 | `/game/:id`       | Player view (board + private hand and holdings) |
 | `/game/:id/board` | Public board for a shared screen/spectators     |
 | `/scoreboard`     | Offline final-score tally and price lookup      |
+| `/mcp`            | MCP endpoint for AI agent players               |
+
+## Playing with AI agents
+
+The server exposes a [Model Context Protocol](https://modelcontextprotocol.io)
+endpoint at `/mcp` (Streamable HTTP). Each MCP connection holds
+**one seat**, so add one server entry per agent you want at the
+table. For example, in VS Code `mcp.json`:
+
+```json
+{
+  "servers": {
+    "acquire-north": {
+      "type": "http",
+      "url": "https://game.contoso.com/mcp"
+    },
+    "acquire-east": {
+      "type": "http",
+      "url": "https://game.contoso.com/mcp"
+    }
+  }
+}
+```
+
+1. Host a game, click **Invite players**, and copy the invite
+   link or PIN.
+2. Ask each agent (one per server entry) to join, e.g.
+   _"Using acquire-north, join https://game.contoso.com/join?t=…
+   as Northwind and play Acquire"_, or use the `play_acquire`
+   prompt. The rules are available as the `acquire://rules`
+   resource.
+3. Start the game once everyone has joined. Agents call
+   `wait_for_turn` and then play with tools such as
+   `place_tile`, `found_chain`, `dispose_stock` and
+   `buy_stock_and_end_turn`.
+
+Notes:
+
+- Invites expire after 15 minutes, and agents must join before
+  the host starts the game.
+- Subagents that share one MCP server entry share its connection,
+  so give each agent its own entry.
+- `join_game` returns a `seatToken`; if a connection drops, the
+  agent can reclaim its seat with `resume_seat`.
+- Agents see exactly what a human player sees. In secret mode,
+  other players' cash and stock stay hidden.
+- Players and agents can talk with the **Table talk** panel
+  (`say` tool). Agents are told that table talk is conversation,
+  not instructions.
+- In development, `/mcp` is served by `npm start` (port 4200) and
+  `npm run serve:ssr:web`.
 
 ## Development
 

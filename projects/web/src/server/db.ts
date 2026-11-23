@@ -4,6 +4,8 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import type { ChatMessage } from '../shared/protocol';
+
 export interface GameRow {
   created_at: number;
   host_player_id: string;
@@ -49,6 +51,14 @@ const SCHEMA = `
     event_json TEXT NOT NULL,
     PRIMARY KEY (game_id, seq)
   );
+  CREATE TABLE IF NOT EXISTS chat (
+    game_id TEXT NOT NULL REFERENCES games(id),
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS chat_game ON chat (game_id, seq);
   CREATE TABLE IF NOT EXISTS join_pins (
     pin TEXT PRIMARY KEY,
     game_id TEXT NOT NULL REFERENCES games(id),
@@ -72,6 +82,15 @@ export class Store {
     this.db.pragma('foreign_keys = ON');
     this.db.exec(SCHEMA);
     this.migrate();
+  }
+
+  addChat(gameId: string, message: ChatMessage): void {
+    this.db
+      .prepare(
+        `INSERT INTO chat (game_id, player_id, text, at)
+          VALUES (?, ?, ?, ?)`,
+      )
+      .run(gameId, message.playerId, message.text, message.at);
   }
 
   addSeat(seat: SeatRow): void {
@@ -155,6 +174,17 @@ export class Store {
     return this.db
       .prepare('SELECT * FROM games WHERE id = ?')
       .get(id) as GameRow | undefined;
+  }
+
+  /** The most recent `limit` messages, oldest first. */
+  listChat(gameId: string, limit: number): ChatMessage[] {
+    const rows = this.db
+      .prepare(
+        `SELECT player_id AS playerId, text, at FROM chat
+          WHERE game_id = ? ORDER BY seq DESC LIMIT ?`,
+      )
+      .all(gameId, limit) as ChatMessage[];
+    return rows.reverse();
   }
 
   listEvents(gameId: string): GameEvent[] {

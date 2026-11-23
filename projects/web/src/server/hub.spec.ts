@@ -210,4 +210,74 @@ describe('GameHub', () => {
       });
     });
   });
+
+  describe('table talk', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('broadcasts seated chat and replays it on connect', async () => {
+      const { a, b } = await seatedGame(false);
+      const owner = listener(a.playerId);
+      const watcher = listener(null);
+      hub.connect(a.gameId, owner.connection);
+      hub.connect(a.gameId, watcher.connection);
+      hub.handle(a.gameId, owner.connection, {
+        type: 'chat',
+        id: '1',
+        text: 'Good luck!',
+      });
+      expect(owner.messages).toContainEqual({
+        type: 'ack',
+        id: '1',
+      });
+      const said = {
+        type: 'chat',
+        messages: [
+          expect.objectContaining({
+            playerId: a.playerId,
+            text: 'Good luck!',
+          }),
+        ],
+      };
+      expect(watcher.messages.at(-1)).toEqual(said);
+
+      hub.handle(a.gameId, watcher.connection, {
+        type: 'chat',
+        id: '2',
+        text: 'heckle',
+      });
+      expect(watcher.messages.at(-1)).toMatchObject({
+        type: 'error',
+        message: 'Spectators cannot act',
+      });
+
+      const guest = listener(b.playerId);
+      hub.connect(a.gameId, guest.connection);
+      expect(guest.messages).toContainEqual(said);
+    });
+
+    it('rate-limits bursts of chat', async () => {
+      vi.useFakeTimers();
+      const { a } = await seatedGame(false);
+      const owner = listener(a.playerId);
+      hub.connect(a.gameId, owner.connection);
+      const say = (id: string) =>
+        hub.handle(a.gameId, owner.connection, {
+          type: 'chat',
+          id,
+          text: 'spam',
+        });
+      ['1', '2', '3'].forEach(say);
+      say('4');
+      expect(owner.messages.at(-1)).toMatchObject({
+        type: 'error',
+        id: '4',
+      });
+      vi.advanceTimersByTime(2000);
+      say('5');
+      expect(owner.messages).toContainEqual({
+        type: 'ack',
+        id: '5',
+      });
+    });
+  });
 });

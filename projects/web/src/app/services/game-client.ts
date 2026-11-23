@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 
 import type {
+  ChatMessage,
   LobbyInfo,
   ServerMessage,
 } from '../../shared/protocol';
@@ -21,6 +22,7 @@ import { avatarEmoji } from '../../shared/avatars';
 import { loadSeat } from './seats';
 
 const LOG_LIMIT = 300;
+const CHAT_LIMIT = 100;
 
 /** One live connection to a game, exposed as signals. */
 @Injectable()
@@ -34,6 +36,8 @@ export class GameClient implements OnDestroy {
     }
     return map;
   });
+  readonly chat = signal<ChatMessage[]>([]);
+  readonly chatError = signal<null | string>(null);
   readonly connected = signal(false);
   readonly error = signal<null | string>(null);
   readonly log = signal<GameEvent[]>([]);
@@ -53,6 +57,8 @@ export class GameClient implements OnDestroy {
 
   readonly you = signal<null | string>(null);
 
+  /** Chat requests, whose replies must not touch `pending`. */
+  private readonly chatIds = new Set<string>();
   private closed = false;
   private counter = 0;
   private gameId = '';
@@ -71,6 +77,16 @@ export class GameClient implements OnDestroy {
     this.socket?.close();
   }
 
+  say(text: string): void {
+    if (this.socket?.readyState !== WebSocket.OPEN) {
+      this.chatError.set('Not connected');
+      return;
+    }
+    const id = this.nextId();
+    this.chatIds.add(id);
+    this.socket.send(JSON.stringify({ type: 'chat', id, text }));
+  }
+
   send(command: CommandInput): void {
     this.post({ type: 'command', id: this.nextId(), command });
   }
@@ -84,10 +100,24 @@ export class GameClient implements OnDestroy {
   }
 
   private handle(message: ServerMessage): void {
+    if (
+      (message.type === 'ack' || message.type === 'error') &&
+      this.chatIds.delete(message.id)
+    ) {
+      this.chatError.set(
+        message.type === 'error' ? message.message : null,
+      );
+      return;
+    }
     switch (message.type) {
       case 'ack':
         this.pending.set(false);
         this.error.set(null);
+        break;
+      case 'chat':
+        this.chat.update((chat) =>
+          [...chat, ...message.messages].slice(-CHAT_LIMIT),
+        );
         break;
       case 'error':
         this.pending.set(false);
@@ -122,6 +152,7 @@ export class GameClient implements OnDestroy {
       this.connected.set(true);
       // Fresh snapshot and history arrive after hello.
       this.log.set([]);
+      this.chat.set([]);
       const seat = this.spectate ? null : loadSeat(this.gameId);
       socket.send(
         JSON.stringify({

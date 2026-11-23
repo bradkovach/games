@@ -22,6 +22,7 @@ import { currentUser, registerAuth } from './auth';
 import { loadConfig, type ServerConfig } from './config';
 import { Store } from './db';
 import { type Connection, GameHub, HttpError } from './hub';
+import { registerMcp } from './mcp/route';
 
 export interface AppOptions {
   /** Built browser bundle to serve statically, if present. */
@@ -122,6 +123,11 @@ export function buildApp(
     scoped.get('/api/health', async () => {
       services().store.ping();
       return { ok: true };
+    });
+
+    registerMcp(scoped, {
+      allowedHosts: config.allowedHosts,
+      hub: () => services().hub,
     });
 
     scoped.get(

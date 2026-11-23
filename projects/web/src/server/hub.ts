@@ -9,6 +9,7 @@ import QRCode from 'qrcode';
 
 import type {
   ActionMessage,
+  ChatMessage,
   InviteInfo,
   LobbyInfo,
   Me,
@@ -44,9 +45,14 @@ export class HttpError extends Error {
 }
 
 const HISTORY = 200;
+const CHAT_HISTORY = 50;
 const MAX_PLAYERS = 6;
+/** Chat token bucket: a short burst, then one per interval. */
+const CHAT_BURST = 3;
+const CHAT_INTERVAL_MS = 2000;
 
 interface Room {
+  chatBudget: Map<string, { at: number; tokens: number }>;
   connections: Set<Connection>;
   game: Game;
   row: GameRow;
@@ -83,6 +89,10 @@ export class GameHub {
     const room = this.room(gameId);
     room.connections.add(connection);
     connection.send({ type: 'lobby', lobby: this.lobby(room) });
+    const chat = this.store.listChat(gameId, CHAT_HISTORY);
+    if (chat.length > 0) {
+      connection.send({ type: 'chat', messages: chat });
+    }
     if (room.game.events.length > 0) {
       this.sendState(
         room,
@@ -133,6 +143,14 @@ export class GameHub {
         id: message.id,
         message: 'Spectators cannot act',
       });
+    }
+    if (message.type === 'chat') {
+      return this.chat(
+        room,
+        connection,
+        message.id,
+        message.text,
+      );
     }
     if (message.type === 'setAvatar') {
       return this.setAvatar(
@@ -254,6 +272,40 @@ export class GameHub {
     }
   }
 
+  private chat(
+    room: Room,
+    connection: Connection,
+    id: string,
+    text: string,
+  ): void {
+    const playerId = connection.playerId!;
+    const now = Date.now();
+    const budget = room.chatBudget.get(playerId) ?? {
+      at: now,
+      tokens: CHAT_BURST,
+    };
+    budget.tokens = Math.min(
+      CHAT_BURST,
+      budget.tokens + (now - budget.at) / CHAT_INTERVAL_MS,
+    );
+    budget.at = now;
+    room.chatBudget.set(playerId, budget);
+    if (budget.tokens < 1) {
+      return connection.send({
+        type: 'error',
+        id,
+        message: 'Slow down — you are chatting too fast',
+      });
+    }
+    budget.tokens -= 1;
+    const message: ChatMessage = { at: now, playerId, text };
+    this.store.addChat(room.row.id, message);
+    connection.send({ type: 'ack', id });
+    for (const peer of room.connections) {
+      peer.send({ type: 'chat', messages: [message] });
+    }
+  }
+
   private lobby(room: Room): LobbyInfo {
     return {
       id: room.row.id,
@@ -286,6 +338,7 @@ export class GameHub {
     const row = this.store.getGame(gameId);
     if (!row) throw new HttpError(404, 'Game not found');
     room = {
+      chatBudget: new Map(),
       connections: new Set(),
       game: new Game(
         this.store.listEvents(gameId),

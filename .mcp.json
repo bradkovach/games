@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "acquire-alice": {
+      "url": "http://localhost:4200/mcp",
+      "type": "http"
+    },
+    "acquire-bob": {
+      "url": "http://localhost:4200/mcp",
+      "type": "http"
+    },
+    "acquire-charlie": {
+      "url": "http://localhost:4200/mcp",
+      "type": "http"
+    }
+  }
+}
