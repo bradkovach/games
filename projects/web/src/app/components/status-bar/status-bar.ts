@@ -122,10 +122,6 @@ import { TILE_HINTS } from '../tile-hints';
         }
       </ul>
     }
-    <span class="end">
-      <span class="muted">{{ bagCount() }} in bag</span>
-      <ng-content />
-    </span>
   `,
 })
 export class StatusBarComponent {
