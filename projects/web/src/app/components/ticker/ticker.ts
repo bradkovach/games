@@ -100,7 +100,7 @@ const NUMBER = new Intl.NumberFormat('en-US', {
     }
   `,
   template: `
-    @for (key of [tick().key]; track key) {
+    @for (key of [tick().key]; track $index) {
       @if (tick().direction; as direction) {
         <span class="arrow" aria-hidden="true">{{
           direction === 'down' ? '▼' : '▲'

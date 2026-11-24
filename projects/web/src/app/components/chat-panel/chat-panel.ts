@@ -11,7 +11,7 @@ import {
 import {
   CHAT_MAX,
   type ChatMessage,
-} from '../../shared/protocol';
+} from '../../../shared/protocol';
 
 /** Table talk: a scrolling list with an optional composer. */
 @Component({

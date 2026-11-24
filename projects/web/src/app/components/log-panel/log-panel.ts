@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { describeEvent } from '../../shared/describe';
+import { describeEvent } from '../../../shared/describe';
 
 /** Pixels from the bottom that still count as "following". */
 const STICK_THRESHOLD = 24;

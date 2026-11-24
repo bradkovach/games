@@ -3,8 +3,8 @@ import type { CommandInput, PlayerView } from 'engine';
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { GameClient } from '../services/game-client';
-import { PreferencesService } from '../services/preferences';
+import { GameClient } from '../../services/game-client';
+import { PreferencesService } from '../../services/preferences';
 import {
   ActionPanelComponent,
   AUTO_END_DELAY_MS,

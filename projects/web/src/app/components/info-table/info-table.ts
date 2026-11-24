@@ -14,7 +14,7 @@ import {
   type PlayerSummary,
 } from 'engine';
 
-import { TickerComponent } from './ticker';
+import { TickerComponent } from '../ticker/ticker';
 
 export type Medal = 1 | 2 | 3;
 

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
+import { TILE_HINTS, tileHints } from '../tile-hints';
 import { BoardComponent } from './board';
-import { TILE_HINTS, tileHints } from './tile-hints';
 
 describe('BoardComponent', () => {
   it('colors tiles by chain and labels them', async () => {

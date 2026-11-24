@@ -11,7 +11,7 @@ import {
   rankPlayers,
 } from 'engine';
 
-import { formatTicker } from './ticker';
+import { formatTicker } from '../ticker/ticker';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,

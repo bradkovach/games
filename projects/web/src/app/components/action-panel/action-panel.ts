@@ -14,10 +14,10 @@ import {
   type PlayerView,
 } from 'engine';
 
-import { GameClient } from '../services/game-client';
-import { PreferencesService } from '../services/preferences';
-import { TickerComponent } from './ticker';
-import { TILE_HINTS } from './tile-hints';
+import { GameClient } from '../../services/game-client';
+import { PreferencesService } from '../../services/preferences';
+import { TickerComponent } from '../ticker/ticker';
+import { TILE_HINTS } from '../tile-hints';
 
 /** Time to cancel before an automatic end of turn. */
 export const AUTO_END_DELAY_MS = 1500;

@@ -8,14 +8,14 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { BoardComponent } from '../components/board';
-import { ChatPanelComponent } from '../components/chat-panel';
-import { InfoTableComponent } from '../components/info-table';
-import { LogPanelComponent } from '../components/log-panel';
-import { PanelComponent } from '../components/panel';
+import { BoardComponent } from '../components/board/board';
+import { ChatPanelComponent } from '../components/chat-panel/chat-panel';
+import { InfoTableComponent } from '../components/info-table/info-table';
+import { LogPanelComponent } from '../components/log-panel/log-panel';
+import { PanelComponent } from '../components/panel/panel';
 import { PreferencesPanelComponent } from '../components/preferences-panel';
-import { ResultsPanelComponent } from '../components/results-panel';
-import { StatusBarComponent } from '../components/status-bar';
+import { ResultsPanelComponent } from '../components/results-panel/results-panel';
+import { StatusBarComponent } from '../components/status-bar/status-bar';
 import { GameClient } from '../services/game-client';
 
 /** Public board for a shared screen; never receives private data. */

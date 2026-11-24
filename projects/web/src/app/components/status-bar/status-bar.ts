@@ -6,8 +6,8 @@ import {
   input,
 } from '@angular/core';
 
-import { TickerComponent } from './ticker';
-import { TILE_HINTS } from './tile-hints';
+import { TickerComponent } from '../ticker/ticker';
+import { TILE_HINTS } from '../tile-hints';
 
 /**
  * Compact always-visible strip under the board: who you are (or

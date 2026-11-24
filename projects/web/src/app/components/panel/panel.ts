@@ -6,7 +6,7 @@ import {
   input,
 } from '@angular/core';
 
-import { PreferencesService } from '../services/preferences';
+import { PreferencesService } from '../../services/preferences';
 
 /**
  * A side panel whose body can be collapsed under its heading. The

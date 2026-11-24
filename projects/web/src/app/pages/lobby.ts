@@ -18,7 +18,7 @@ import { Router, RouterLink } from '@angular/router';
 import type { InviteInfo } from '../../shared/protocol';
 
 import { AvatarPickerComponent } from '../components/avatar-picker';
-import { ChatPanelComponent } from '../components/chat-panel';
+import { ChatPanelComponent } from '../components/chat-panel/chat-panel';
 import { Api } from '../services/api';
 import { GameClient } from '../services/game-client';
 import { clearSeat, saveSeat } from '../services/seats';
