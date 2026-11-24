@@ -19,7 +19,7 @@ import type {
 } from '../../shared/protocol';
 
 import { avatarEmoji } from '../../shared/avatars';
-import { loadSeat } from './seats';
+import { clearSeat, loadSeat } from './seats';
 
 const LOG_LIMIT = 300;
 const CHAT_LIMIT = 100;
@@ -40,6 +40,8 @@ export class GameClient implements OnDestroy {
   readonly chatError = signal<null | string>(null);
   readonly connected = signal(false);
   readonly error = signal<null | string>(null);
+  /** Set once this device gives up its seat in the lobby. */
+  readonly left = signal(false);
   readonly log = signal<GameEvent[]>([]);
   readonly view = signal<null | PlayerView | PublicView>(null);
   readonly me = computed(() => {
@@ -62,6 +64,7 @@ export class GameClient implements OnDestroy {
   private closed = false;
   private counter = 0;
   private gameId = '';
+  private leaveId: null | string = null;
   private retry = 0;
   private socket?: WebSocket;
   private spectate = false;
@@ -72,9 +75,35 @@ export class GameClient implements OnDestroy {
     this.open();
   }
 
+  leave(): void {
+    this.leaveId = this.nextId();
+    this.post({ type: 'leave', id: this.leaveId });
+  }
+
   ngOnDestroy(): void {
     this.closed = true;
     this.socket?.close();
+  }
+
+  patchSeat(patch: { avatar?: string; name?: string }): void {
+    this.post({
+      type: 'patchSeat',
+      id: this.nextId(),
+      ...patch,
+    });
+  }
+
+  /** Drops the current socket and says hello again. */
+  reconnect(spectate = false): void {
+    this.spectate = spectate;
+    this.error.set(null);
+    if (!spectate) this.left.set(false);
+    const old = this.socket;
+    if (old) {
+      old.onclose = null;
+      old.close();
+    }
+    this.open();
   }
 
   say(text: string): void {
@@ -88,15 +117,7 @@ export class GameClient implements OnDestroy {
   }
 
   send(command: CommandInput): void {
-    this.post({ type: 'command', id: this.nextId(), command });
-  }
-
-  setAvatar(avatar: string): void {
-    this.post({ type: 'setAvatar', id: this.nextId(), avatar });
-  }
-
-  start(): void {
-    this.post({ type: 'start', id: this.nextId() });
+    this.post({ type: 'command', command, id: this.nextId() });
   }
 
   private handle(message: ServerMessage): void {
@@ -108,6 +129,12 @@ export class GameClient implements OnDestroy {
         message.type === 'error' ? message.message : null,
       );
       return;
+    }
+    if (message.type === 'ack' && message.id === this.leaveId) {
+      // The server already treats this socket as a spectator.
+      clearSeat(this.gameId);
+      this.spectate = true;
+      this.left.set(true);
     }
     switch (message.type) {
       case 'ack':
@@ -125,6 +152,7 @@ export class GameClient implements OnDestroy {
         break;
       case 'lobby':
         this.lobby.set(message.lobby);
+        this.you.set(message.you);
         break;
       case 'state':
         this.view.set(message.view);

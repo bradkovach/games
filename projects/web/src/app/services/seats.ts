@@ -2,6 +2,10 @@ import type { SeatGrant } from '../../shared/protocol';
 
 const key = (gameId: string) => `acquire.seat.${gameId}`;
 
+export function clearSeat(gameId: string): void {
+  localStorage.removeItem(key(gameId));
+}
+
 export function loadSeat(gameId: string): null | SeatGrant {
   if (typeof localStorage === 'undefined') return null;
   const raw = localStorage.getItem(key(gameId));

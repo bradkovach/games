@@ -1,4 +1,5 @@
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -111,9 +112,13 @@ const NUMBER = new Intl.NumberFormat('en-US', {
 })
 export class TickerComponent {
   readonly format = input<TickerFormat>('number');
+  /** Prefix positive values with `+`. */
+  readonly signed = input(false, {
+    transform: booleanAttribute,
+  });
   readonly value = input.required<number>();
   protected readonly text = computed(() =>
-    formatTicker(this.value(), this.format()),
+    formatTicker(this.value(), this.format(), this.signed()),
   );
   protected readonly tick = linkedSignal<number, Tick>({
     computation: (value, previous) => {
@@ -133,16 +138,17 @@ export class TickerComponent {
     const { previous } = this.tick();
     return previous === null
       ? null
-      : `Was ${formatTicker(previous, this.format())}`;
+      : `Was ${formatTicker(previous, this.format(), this.signed())}`;
   });
 }
 
 export function formatTicker(
   value: number,
   format: TickerFormat,
+  signed = false,
 ): string {
   const text = NUMBER.format(Math.abs(value));
-  const sign = value < 0 ? '−' : '';
+  const sign = value < 0 ? '−' : signed && value > 0 ? '+' : '';
   return format === 'currency'
     ? `${sign}$${text}`
     : `${sign}${text}`;

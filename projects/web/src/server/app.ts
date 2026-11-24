@@ -15,6 +15,7 @@ import {
   AvatarsQuerySchema,
   ClientMessageSchema,
   CreateGameSchema,
+  HostSeatSchema,
   JoinRequestSchema,
   type ServerMessage,
 } from '../shared/protocol';
@@ -34,7 +35,7 @@ export interface AppOptions {
   ssr?: boolean;
 }
 
-/** Builds the Fastify app. Storage opens lazily on first use. */
+/** Builds the Fastify app. Storage opens on listen or first use. */
 export function buildApp(
   options: AppOptions = {},
 ): FastifyInstance {
@@ -47,9 +48,25 @@ export function buildApp(
   let store: Store | undefined;
   const services = () => {
     store ??= new Store(config.dataDir);
-    hub ??= new GameHub(store, config.secret, config.publicUrl);
+    hub ??= new GameHub(
+      store,
+      config.secret,
+      config.publicUrl,
+      config.gameIdleMs,
+    );
     return { hub, store };
   };
+
+  // Open storage when serving so a bad data directory shows up in
+  // the logs at startup and old games get their cleanup timers.
+  app.addHook('onListen', async () => {
+    try {
+      services();
+    } catch (error) {
+      app.log.error(error);
+    }
+  });
+  app.addHook('onClose', async () => hub?.dispose());
 
   app.register(fastifyCookie, { secret: config.secret });
   app.register(fastifyWebsocket, {
@@ -87,10 +104,18 @@ export function buildApp(
       const user = currentUser(request);
       if (!user)
         return reply.code(401).send({ error: 'Sign in first' });
-      const { avatar, ...settings } = CreateGameSchema.parse(
+      const settings = CreateGameSchema.parse(
         request.body ?? {},
       );
-      return services().hub.createGame(user, settings, avatar);
+      return services().hub.createGame(user, settings);
+    });
+
+    scoped.get('/api/games/:id/host', async (request) => {
+      const { id } = request.params as { id: string };
+      return services().hub.hostStatus(
+        id,
+        currentUser(request)?.id,
+      );
     });
 
     scoped.post(
@@ -103,6 +128,41 @@ export function buildApp(
             .send({ error: 'Sign in first' });
         const { id } = request.params as { id: string };
         return services().hub.invite(id, user.id);
+      },
+    );
+
+    scoped.post(
+      '/api/games/:id/seat',
+      async (request, reply) => {
+        const user = currentUser(request);
+        if (!user)
+          return reply
+            .code(401)
+            .send({ error: 'Sign in first' });
+        const { id } = request.params as { id: string };
+        const { avatar, name } = HostSeatSchema.parse(
+          request.body,
+        );
+        return services().hub.seatHost(
+          id,
+          user.id,
+          name,
+          avatar,
+        );
+      },
+    );
+
+    scoped.post(
+      '/api/games/:id/start',
+      async (request, reply) => {
+        const user = currentUser(request);
+        if (!user)
+          return reply
+            .code(401)
+            .send({ error: 'Sign in first' });
+        const { id } = request.params as { id: string };
+        services().hub.start(id, user.id);
+        return { ok: true };
       },
     );
 

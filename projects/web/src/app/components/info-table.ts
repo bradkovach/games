@@ -336,8 +336,8 @@ export class InfoTableComponent {
     return this.players().map((p) => {
       const own = p.id === you && me ? me : null;
       return {
-        id: p.id,
         cash: p.cash ?? own?.cash,
+        id: p.id,
         name: p.name,
         stock: p.stock ?? own?.stock,
       };

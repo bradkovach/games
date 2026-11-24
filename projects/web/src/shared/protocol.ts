@@ -12,6 +12,13 @@ const AvatarSchema = z
   .string()
   .refine(isAvatar, { message: 'Unknown avatar' });
 
+const NameSchema = z.string().trim().min(1).max(40);
+
+/** Fields a seated player can change; at least one is required. */
+const SeatPatchShape = {
+  avatar: AvatarSchema.optional(),
+  name: NameSchema.optional(),
+};
 export const CHAT_MAX = 200;
 
 export const ClientMessageSchema = z.discriminatedUnion('type', [
@@ -22,18 +29,18 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('command'),
-    id: z.string().max(64),
     command: z.unknown(),
+    id: z.string().max(64),
   }),
   z.object({
     type: z.literal('hello'),
     seatToken: z.string().max(128).optional(),
   }),
-  z.object({ type: z.literal('start'), id: z.string().max(64) }),
+  z.object({ type: z.literal('leave'), id: z.string().max(64) }),
   z.object({
-    type: z.literal('setAvatar'),
+    type: z.literal('patchSeat'),
     id: z.string().max(64),
-    avatar: AvatarSchema,
+    ...SeatPatchShape,
   }),
 ]);
 export type ActionMessage = Exclude<
@@ -50,7 +57,8 @@ export interface ChatMessage {
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
 export interface LobbyInfo {
-  hostPlayerId: string;
+  /** Null while the host has no seat. */
+  hostPlayerId: null | string;
   id: string;
   players: { avatar: string; id: string; name: string }[];
   settings: z.infer<typeof GameSettingsSchema>;
@@ -68,21 +76,29 @@ export type ServerMessage =
     }
   | { id: string; message: string; type: 'error' }
   | { id: string; type: 'ack' }
-  | { lobby: LobbyInfo; type: 'lobby' }
+  | { lobby: LobbyInfo; type: 'lobby'; you: null | string }
   | { messages: ChatMessage[]; type: 'chat' };
 
 export const JoinRequestSchema = z.object({
   avatar: AvatarSchema.optional(),
   code: z.string().min(1).max(512),
-  name: z.string().trim().min(1).max(40),
+  name: NameSchema,
 });
+
+export const HostSeatSchema = z.object({
+  avatar: AvatarSchema.optional(),
+  name: NameSchema,
+});
+
+export interface HostStatus {
+  isHost: boolean;
+}
 
 export const AvatarsQuerySchema = z.object({
   code: z.string().min(1).max(512),
 });
 
 export const CreateGameSchema = z.object({
-  avatar: AvatarSchema.optional(),
   mode: z.enum(['classic', 'tycoon']).default('classic'),
   secretHoldings: z.boolean().default(false),
 });

@@ -23,7 +23,10 @@ module.exports = defineConfig([
         {
           customGroups: [
             { elementNamePattern: '^type$', groupName: 'type' },
-            { elementNamePattern: '^id$', groupName: 'id' },
+            {
+              elementNamePattern: '^\w+[Ii]d$',
+              groupName: 'id',
+            },
           ],
           groups: ['type', 'id', 'unknown'],
           type: 'natural',
@@ -40,4 +43,7 @@ module.exports = defineConfig([
     rules: {},
   },
   prettier,
+  {
+    ignores: ['dist/**/*'],
+  },
 ]);

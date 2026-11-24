@@ -21,9 +21,9 @@ const player = (
   stock: PlayerSummary['stock'] = undefined,
   cash: number | undefined = 6000,
 ): PlayerSummary => ({
-  id,
   cash,
   handCount: 6,
+  id,
   name: id.toUpperCase(),
   stock,
 });
@@ -204,8 +204,8 @@ describe('InfoTableComponent', () => {
 
   it('fills only your own column in secret games', async () => {
     const hidden = (id: string): PlayerSummary => ({
-      id,
       handCount: 6,
+      id,
       name: id.toUpperCase(),
     });
     const el = await render([hidden('a'), hidden('b')], {

@@ -71,13 +71,22 @@ export class Store {
   private readonly db: Database.Database;
 
   constructor(dataDir: string) {
-    if (dataDir !== ':memory:')
-      mkdirSync(dataDir, { recursive: true });
-    this.db = new Database(
+    const file =
       dataDir === ':memory:'
         ? ':memory:'
-        : join(dataDir, 'acquire.db'),
-    );
+        : join(dataDir, 'acquire.db');
+    try {
+      if (dataDir !== ':memory:')
+        mkdirSync(dataDir, { recursive: true });
+      this.db = new Database(file);
+    } catch (error) {
+      throw new Error(
+        `Cannot open the database at ${file}; check that the ` +
+          `directory exists and is writable by uid ` +
+          `${process.getuid?.() ?? '?'}.`,
+        { cause: error },
+      );
+    }
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.db.exec(SCHEMA);
@@ -155,6 +164,24 @@ export class Store {
     return result.changes === 1;
   }
 
+  /** Removes a game and everything that belongs to it. */
+  deleteGame(gameId: string): void {
+    this.db.transaction(() => {
+      for (const table of [
+        'join_pins',
+        'chat',
+        'game_events',
+        'seats',
+        'games',
+      ]) {
+        const column = table === 'games' ? 'id' : 'game_id';
+        this.db
+          .prepare(`DELETE FROM ${table} WHERE ${column} = ?`)
+          .run(gameId);
+      }
+    })();
+  }
+
   findPin(pin: string): string | undefined {
     const row = this.db
       .prepare(
@@ -198,6 +225,14 @@ export class Store {
     );
   }
 
+  listGameIds(): string[] {
+    return (
+      this.db.prepare('SELECT id FROM games').all() as {
+        id: string;
+      }[]
+    ).map((row) => row.id);
+  }
+
   listSeats(gameId: string): SeatRow[] {
     return this.db
       .prepare(
@@ -206,21 +241,45 @@ export class Store {
       .all(gameId) as SeatRow[];
   }
 
+  patchSeat(
+    gameId: string,
+    playerId: string,
+    patch: { avatar?: string; name?: string },
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE seats SET avatar = COALESCE(@avatar, avatar),
+          name = COALESCE(@name, name)
+          WHERE game_id = @gameId AND player_id = @playerId`,
+      )
+      .run({
+        avatar: patch.avatar ?? null,
+        gameId,
+        name: patch.name ?? null,
+        playerId,
+      });
+  }
+
   /** Cheap liveness check for the health endpoint. */
   ping(): void {
     this.db.prepare('SELECT 1').get();
   }
 
-  setAvatar(
-    gameId: string,
-    playerId: string,
-    avatar: string,
-  ): void {
+  removeSeat(gameId: string, playerId: string): void {
     this.db
       .prepare(
-        'UPDATE seats SET avatar = ? WHERE game_id = ? AND player_id = ?',
+        'DELETE FROM seats WHERE game_id = ? AND player_id = ?',
       )
-      .run(avatar, gameId, playerId);
+      .run(gameId, playerId);
+  }
+
+  /** `''` marks a host without a seat. */
+  setHostPlayer(gameId: string, playerId: string): void {
+    this.db
+      .prepare(
+        'UPDATE games SET host_player_id = ? WHERE id = ?',
+      )
+      .run(playerId, gameId);
   }
 
   upsertUser(user: {

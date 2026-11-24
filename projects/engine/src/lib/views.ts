@@ -69,12 +69,12 @@ export function playerView(
   return {
     ...view,
     me: {
-      id: playerId,
       cash: state.cash[playerId] ?? 0,
       hand: (state.hands[playerId] ?? []).map((tile) => ({
         status: tileStatus(state, tile),
         tile,
       })),
+      id: playerId,
       stock: { ...state.stock[playerId] },
     },
   };
@@ -99,8 +99,8 @@ export function publicView(state: GameState): PublicView {
     endDeclared: state.endDeclared,
     phase: state.phase,
     players: state.players.map(({ id, name }) => ({
-      id,
       handCount: state.hands[id]?.length ?? 0,
+      id,
       name,
       ...(hidden
         ? {}

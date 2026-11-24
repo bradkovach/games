@@ -6,6 +6,7 @@ import {
   input,
   type OnInit,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { BoardComponent } from '../components/board';
 import { ChatPanelComponent } from '../components/chat-panel';
@@ -28,6 +29,7 @@ import { GameClient } from '../services/game-client';
     PanelComponent,
     PreferencesPanelComponent,
     ResultsPanelComponent,
+    RouterLink,
     StatusBarComponent,
   ],
   providers: [GameClient],
@@ -94,6 +96,7 @@ import { GameClient } from '../services/game-client';
       <section class="panel page">
         <h2>Waiting for the game to start</h2>
         <p>{{ lobby.players.length }} player(s) seated.</p>
+        <a [routerLink]="['/game', id()]">Back to the lobby</a>
       </section>
     } @else if (client.error(); as error) {
       <p class="error page">{{ error }}</p>

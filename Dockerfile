@@ -26,8 +26,10 @@ ENV NODE_ENV=production \
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist/web ./dist/web
 COPY package.json ./
+COPY --chmod=755 entrypoint.sh /usr/local/bin/acquire-entrypoint
 RUN mkdir -p /data && chown node:node /data
-USER node
+# Starts as root to fix /data ownership, then runs as `node`.
+ENTRYPOINT ["acquire-entrypoint"]
 VOLUME /data
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \

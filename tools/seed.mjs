@@ -29,22 +29,33 @@ async function post(base, url, body, headers = {}) {
 
 /**
  * Creates a game as the host and seats `guests` through an invite.
- * Returns seat grants ({ gameId, playerId, seatToken }); the host's
- * grant can be put in localStorage as `acquire.seat.<gameId>`.
+ * With `seatHost` the host also takes a seat, as "Join on this
+ * device" does. Seat grants look like { gameId, playerId, seatToken }
+ * and can be put in localStorage as `acquire.seat.<gameId>`; `host`
+ * is null when the host has no seat. `cookie` is the host session.
  */
 export async function seedGame({
   base,
   guests = ['Bob'],
+  seatHost = true,
   secret,
   settings = {},
 }) {
   const cookie = hostCookie(secret);
-  const host = await post(base, '/api/games', settings, {
+  const { gameId } = await post(base, '/api/games', settings, {
     cookie,
   });
+  const host = seatHost
+    ? await post(
+        base,
+        `/api/games/${gameId}/seat`,
+        { name: 'Hana' },
+        { cookie },
+      )
+    : null;
   const invite = await post(
     base,
-    `/api/games/${host.gameId}/invites`,
+    `/api/games/${gameId}/invites`,
     {},
     { cookie },
   );
@@ -54,7 +65,7 @@ export async function seedGame({
       await post(base, '/api/join', { code: invite.pin, name }),
     );
   }
-  return { guests: seats, host, invite };
+  return { cookie, gameId, guests: seats, host, invite };
 }
 
 /** Opens a seated WebSocket; `onState` gets every state message. */
@@ -83,13 +94,9 @@ export function connect(base, grant, onState = () => {}) {
   });
 }
 
-/** Starts the game from the host's seat. */
-export async function startGame(base, host) {
-  const socket = await connect(base, host);
-  await sleep(300);
-  socket.send({ type: 'start' });
-  await sleep(300);
-  socket.close();
+/** Starts a game as its host; pass what `seedGame` returned. */
+export async function startGame(base, { cookie, gameId }) {
+  await post(base, `/api/games/${gameId}/start`, {}, { cookie });
 }
 
 /** A simple legal move: first playable tile, no purchases. */

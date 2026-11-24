@@ -44,7 +44,6 @@ function makeView(
     discarded: [],
     endDeclared: false,
     me: {
-      id: 'a',
       cash,
       hand: [
         {
@@ -52,6 +51,7 @@ function makeView(
           tile: '1A',
         },
       ],
+      id: 'a',
       stock: { ...STOCK },
     },
     phase: { kind: 'buyStock', playerId: 'a' },
@@ -132,12 +132,12 @@ describe('ActionPanelComponent', () => {
     view.set(
       makeView({
         me: {
-          id: 'a',
           cash: 6000,
           hand: [
             { status: 'playable', tile: '1A' },
             { status: 'dead', tile: '5C' },
           ],
+          id: 'a',
           stock: { ...STOCK },
         },
         phase: { kind: 'placeTile', playerId: 'a' },
@@ -175,9 +175,9 @@ describe('ActionPanelComponent', () => {
           },
         ],
         me: {
-          id: 'a',
           cash: 6000,
           hand: [],
+          id: 'a',
           stock: { ...STOCK, sackson: 5 },
         },
         phase: {
@@ -201,6 +201,13 @@ describe('ActionPanelComponent', () => {
     button('Trade two more').click();
     await fixture.whenStable();
     expect(button('Trade two more').disabled).toBe(true);
+    // 1 Tower ($300) for 2 Sackson ($400 each) loses $500.
+    expect(el.querySelector('.prices')?.textContent).toContain(
+      '−$500',
+    );
+    expect(el.querySelector('.net')?.textContent).toContain(
+      '−$500',
+    );
     for (let i = 0; i < 3; i++) {
       button('Sell one more').click();
       await fixture.whenStable();
@@ -209,6 +216,7 @@ describe('ActionPanelComponent', () => {
     expect(el.querySelector('.keep')?.textContent?.trim()).toBe(
       '0',
     );
+    expect(el.textContent).toContain('Cash +$1,200');
     el.querySelector<HTMLButtonElement>(
       'p button:not(.secondary)',
     )!.click();

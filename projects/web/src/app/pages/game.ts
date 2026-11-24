@@ -11,19 +11,11 @@ import {
   Injector,
   input,
   type OnInit,
-  signal,
   viewChild,
 } from '@angular/core';
-import {
-  DomSanitizer,
-  type SafeUrl,
-} from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
-
-import type { InviteInfo } from '../../shared/protocol';
+import { Router, RouterLink } from '@angular/router';
 
 import { ActionPanelComponent } from '../components/action-panel';
-import { AvatarPickerComponent } from '../components/avatar-picker';
 import { BoardComponent } from '../components/board';
 import { ChatPanelComponent } from '../components/chat-panel';
 import { InfoTableComponent } from '../components/info-table';
@@ -33,7 +25,6 @@ import { PreferencesPanelComponent } from '../components/preferences-panel';
 import { ResultsPanelComponent } from '../components/results-panel';
 import { StatusBarComponent } from '../components/status-bar';
 import { tileHints } from '../components/tile-hints';
-import { Api } from '../services/api';
 import { GameClient } from '../services/game-client';
 import { PreferencesService } from '../services/preferences';
 import { loadSeat } from '../services/seats';
@@ -42,7 +33,6 @@ import { loadSeat } from '../services/seats';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ActionPanelComponent,
-    AvatarPickerComponent,
     BoardComponent,
     ChatPanelComponent,
     InfoTableComponent,
@@ -55,144 +45,17 @@ import { loadSeat } from '../services/seats';
   ],
   providers: [GameClient],
   selector: 'app-game',
-  styles: `
-    .lobby-players {
-      list-style: none;
-      padding: 0;
-    }
-    .lobby-avatar {
-      display: inline-block;
-      font-size: 1.4rem;
-      width: 2rem;
-    }
-    .qr {
-      max-width: 220px;
-      width: 100%;
-    }
-  `,
   styleUrls: ['./frame.css'],
   template: `
     @if (!hasSeat) {
       <section class="panel page">
         <p>You don't have a seat in this game.</p>
-        <a [routerLink]="['/game', id(), 'board']"
+        <a [routerLink]="['/game', id(), 'watch']"
           >Watch the board instead</a
         >
       </section>
-    } @else if (client.lobby(); as lobby) {
-      @if (!lobby.started) {
-        <div class="page">
-          <section class="panel">
-            <h2>Lobby</h2>
-            <p class="muted">
-              {{
-                lobby.settings.mode === 'tycoon'
-                  ? 'Tycoon'
-                  : 'Classic'
-              }}
-              mode
-              {{
-                lobby.settings.secretHoldings
-                  ? '· secret holdings'
-                  : ''
-              }}
-            </p>
-            <ol class="lobby-players">
-              @for (p of lobby.players; track p.id) {
-                <li>
-                  <span
-                    class="emoji lobby-avatar"
-                    aria-hidden="true"
-                    >{{ client.avatars().get(p.id) }}</span
-                  >
-                  {{ p.name }}
-                  {{
-                    p.id === lobby.hostPlayerId ? '(host)' : ''
-                  }}
-                  {{ p.id === client.you() ? '(you)' : '' }}
-                </li>
-              }
-            </ol>
-            @if (client.you(); as you) {
-              <details>
-                <summary>Change your mascot</summary>
-                <app-avatar-picker
-                  [value]="myAvatar()"
-                  [taken]="takenAvatars()"
-                  (valueChange)="
-                    $event && client.setAvatar($event)
-                  "
-                />
-              </details>
-              @if (client.error(); as error) {
-                <p class="error">{{ error }}</p>
-              }
-            }
-            @if (isHost()) {
-              <div class="row">
-                <button
-                  type="button"
-                  class="secondary"
-                  (click)="invite()"
-                >
-                  {{
-                    inviteInfo()
-                      ? 'New invite'
-                      : 'Invite players'
-                  }}
-                </button>
-                <button
-                  type="button"
-                  [disabled]="lobby.players.length < 2"
-                  (click)="client.start()"
-                >
-                  Start game
-                </button>
-              </div>
-              @if (inviteInfo(); as info) {
-                <div
-                  class="row"
-                  style="margin-top: 1rem; align-items: flex-start"
-                >
-                  <img
-                    class="qr"
-                    alt="Invite QR code"
-                    [src]="qr()"
-                  />
-                  <div>
-                    <p>
-                      PIN:
-                      <strong style="font-size: 1.5rem">{{
-                        info.pin
-                      }}</strong>
-                    </p>
-                    <p class="muted">
-                      Expires at {{ expires(info.expiresAt) }}
-                    </p>
-                    <p><a [href]="info.url">Invite link</a></p>
-                  </div>
-                </div>
-              }
-              @if (inviteError()) {
-                <p class="error">{{ inviteError() }}</p>
-              }
-            } @else {
-              <p class="muted">Waiting for the host to start…</p>
-            }
-          </section>
-          <section class="panel">
-            <h3>Table talk</h3>
-            <app-chat-panel
-              [messages]="client.chat()"
-              [names]="client.names()"
-              [avatars]="client.avatars()"
-              [canSend]="client.you() !== null"
-              [error]="client.chatError()"
-              (say)="client.say($event)"
-            />
-          </section>
-        </div>
-      } @else if (view(); as view) {
+    } @else if (client.lobby()?.started) {
+      @if (view(); as view) {
         <div
           class="frame"
           [class.my-turn]="myTurn()"
@@ -225,7 +88,7 @@ import { loadSeat } from '../services/seats';
             [turn]="myTurn()"
           >
             <a
-              [routerLink]="['/game', id(), 'board']"
+              [routerLink]="['/game', id(), 'watch']"
               target="_blank"
               >Board view</a
             >
@@ -311,23 +174,6 @@ export class GamePage implements OnInit {
   protected readonly hints = computed(() =>
     tileHints(this.view()?.me.hand ?? []),
   );
-  protected readonly inviteError = signal<null | string>(null);
-  protected readonly inviteInfo = signal<InviteInfo | null>(
-    null,
-  );
-  protected readonly isHost = computed(
-    () =>
-      this.client.lobby()?.hostPlayerId === this.client.you() ||
-      this.client.lobby()?.hostPlayerId ===
-        loadSeat(this.id())?.playerId,
-  );
-  protected readonly myAvatar = computed(
-    () =>
-      this.client
-        .lobby()
-        ?.players.find((p) => p.id === this.client.you())
-        ?.avatar ?? null,
-  );
   protected readonly myName = computed(
     () =>
       this.client.names().get(this.client.you() ?? '') ?? 'You',
@@ -340,16 +186,6 @@ export class GamePage implements OnInit {
     return 'playerId' in phase && phase.playerId === view.me.id;
   });
   protected readonly prefs = inject(PreferencesService);
-  private readonly sanitizer = inject(DomSanitizer);
-  protected readonly qr = computed<null | SafeUrl>(() => {
-    const info = this.inviteInfo();
-    // Server-generated SVG, rendered as an image so it cannot run script.
-    return info
-      ? this.sanitizer.bypassSecurityTrustUrl(
-          `data:image/svg+xml;utf8,${encodeURIComponent(info.qrSvg)}`,
-        )
-      : null;
-  });
   protected readonly selectable = computed(() => {
     const view = this.view();
     if (!view) return [];
@@ -363,9 +199,6 @@ export class GamePage implements OnInit {
       .filter((t) => t.status === 'playable')
       .map((t) => t.tile);
   });
-  protected readonly takenAvatars = computed(() =>
-    (this.client.lobby()?.players ?? []).map((p) => p.avatar),
-  );
   protected readonly turnCue = computed(() => {
     if (this.view()?.results) return 'Game over';
     if (this.myTurn()) return 'Your turn';
@@ -375,7 +208,6 @@ export class GamePage implements OnInit {
   });
   private readonly actions =
     viewChild<ElementRef<HTMLElement>>('actions');
-  private readonly api = inject(Api);
   /** Changes with each decision this player is asked to make. */
   private readonly decision = computed(() => {
     const view = this.view();
@@ -383,8 +215,18 @@ export class GamePage implements OnInit {
     return `${view.phase.kind}:${this.client.log().length}`;
   });
   private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
 
   constructor() {
+    // Seats are only playable once the host starts; wait in the lobby.
+    effect(() => {
+      const lobby = this.client.lobby();
+      if (lobby && !lobby.started) {
+        void this.router.navigate(['/game', this.id()], {
+          replaceUrl: true,
+        });
+      }
+    });
     // Small screens scroll the actions away; bring them back once
     // the panel has rendered the new decision.
     effect(() => {
@@ -398,21 +240,6 @@ export class GamePage implements OnInit {
   ngOnInit(): void {
     this.hasSeat = loadSeat(this.id()) !== null;
     if (this.hasSeat) this.client.connect(this.id());
-  }
-
-  protected expires(at: number): string {
-    return new Date(at).toLocaleTimeString();
-  }
-
-  protected async invite(): Promise<void> {
-    try {
-      this.inviteError.set(null);
-      this.inviteInfo.set(await this.api.invite(this.id()));
-    } catch (error) {
-      this.inviteError.set(
-        `${(error as Error).message}. Sign in as the host to invite.`,
-      );
-    }
   }
 
   protected readonly nameOf = (id: string) =>

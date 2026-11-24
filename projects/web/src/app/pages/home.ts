@@ -13,13 +13,11 @@ import {
 
 import type { Me } from '../../shared/protocol';
 
-import { AvatarPickerComponent } from '../components/avatar-picker';
 import { Api } from '../services/api';
-import { saveSeat } from '../services/seats';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AvatarPickerComponent, RouterLink],
+  imports: [RouterLink],
   selector: 'app-home',
   template: `
     <div class="grid-2">
@@ -68,8 +66,6 @@ import { saveSeat } from '../services/seats';
               Keep money and stock secret
             </label>
           </p>
-          <p>Your mascot</p>
-          <app-avatar-picker [(value)]="avatar" />
           <p>
             <button
               type="button"
@@ -104,7 +100,6 @@ import { saveSeat } from '../services/seats';
   `,
 })
 export class HomePage implements OnInit {
-  protected readonly avatar = signal<null | string>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<null | string>(null);
   protected readonly loading = signal(true);
@@ -120,13 +115,11 @@ export class HomePage implements OnInit {
   async create(): Promise<void> {
     this.busy.set(true);
     try {
-      const grant = await this.api.createGame({
-        avatar: this.avatar() ?? undefined,
+      const { gameId } = await this.api.createGame({
         mode: this.mode(),
         secretHoldings: this.secret(),
       });
-      saveSeat(grant);
-      await this.router.navigate(['/game', grant.gameId]);
+      await this.router.navigate(['/game', gameId]);
     } catch (error) {
       this.error.set((error as Error).message);
     } finally {

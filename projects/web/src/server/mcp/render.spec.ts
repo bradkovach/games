@@ -37,7 +37,7 @@ describe('renderSnapshot', () => {
       ],
       discarded: [],
       endDeclared: false,
-      me: { id: 'a', cash: 6000, hand: [], stock: { ...STOCK } },
+      me: { cash: 6000, hand: [], id: 'a', stock: { ...STOCK } },
       phase: {
         acquired: 'tower',
         kind: 'disposeStock',
@@ -55,12 +55,12 @@ describe('renderSnapshot', () => {
       chat: [],
       events: [],
       lobby: {
-        id: 'g',
         hostPlayerId: 'a',
+        id: 'g',
         players: [
-          { id: 'a', avatar: '⛵', name: 'Alice' },
-          { id: 'b', avatar: '⚓', name: 'Bob' },
-          { id: 'c', avatar: '☄', name: 'Carol' },
+          { avatar: '⛵', id: 'a', name: 'Alice' },
+          { avatar: '⚓', id: 'b', name: 'Bob' },
+          { avatar: '☄', id: 'c', name: 'Carol' },
         ],
         settings: { mode: 'classic', secretHoldings: true },
         started: true,

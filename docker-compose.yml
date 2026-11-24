@@ -22,7 +22,4 @@ services:
       # Reverse proxy: games.zombarista.io -> this port
       - '4000:4000'
     volumes:
-      - acquire-data:/data
-
-volumes:
-  acquire-data:
+      - ./data/acquire:/data

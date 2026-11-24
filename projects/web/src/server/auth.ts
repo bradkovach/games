@@ -22,8 +22,8 @@ const LoginStateSchema = z.object({
 });
 
 const MeSchema = z.object({
-  id: z.string(),
   email: z.string().optional(),
+  id: z.string(),
   name: z.string(),
 });
 
@@ -126,7 +126,7 @@ export function registerAuth(
         typeof claims['name'] === 'string'
           ? claims['name']
           : (email ?? 'Host');
-      const user: Me = { id: claims.sub, email, name };
+      const user: Me = { email, id: claims.sub, name };
       onLogin(user);
       reply.setCookie(
         SESSION_COOKIE,

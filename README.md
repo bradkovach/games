@@ -117,8 +117,16 @@ docker compose up -d
 ```
 
 Games are stored in the `acquire-data` volume (`/data/acquire.db`).
-The container runs as the `node` user, listens on port 4000, and
-reports health at `/api/health`. All settings are listed under
+A host bind mount such as `./data/acquire:/data` also works, even
+if Docker creates the directory as root: the entrypoint creates
+`/data` and hands it to the `node` user before starting the server
+as `node`. The server listens on port 4000 and reports health at
+`/api/health`.
+
+A game is deleted 15 minutes (`GAME_IDLE_MINUTES`) after its last
+player, spectator or agent disconnects; anyone reconnecting sooner
+keeps it. Games already in the database when the server starts get
+the same grace period. All settings are listed under
 [Configuration](#configuration).
 
 ## Routes
@@ -127,8 +135,10 @@ reports health at `/api/health`. All settings are listed under
 | ----------------- | ----------------------------------------------- |
 | `/`               | Host a game (requires sign-in) or join with PIN |
 | `/join?t=…`       | Join via QR invite link or PIN                  |
-| `/game/:id`       | Player view (board + private hand and holdings) |
-| `/game/:id/board` | Public board for a shared screen/spectators     |
+| `/game/:id`       | Lobby: invite, seats, names, mascots, start     |
+| `/game/:id/play`  | Player view (board + private hand and holdings) |
+| `/game/:id/watch` | Public board for a shared screen/spectators     |
+| `/game/:id/board` | Old board link; redirects to `/game/:id/watch`  |
 | `/scoreboard`     | Offline final-score tally and price lookup      |
 | `/mcp`            | MCP endpoint for AI agent players               |
 
@@ -154,8 +164,7 @@ table. For example, in VS Code `mcp.json`:
 }
 ```
 
-1. Host a game, click **Invite players**, and copy the invite
-   link or PIN.
+1. Host a game and copy the invite link or PIN from the lobby.
 2. Ask each agent (one per server entry) to join, e.g.
    _"Using acquire-north, join https://game.contoso.com/join?t=…
    as Northwind and play Acquire"_, or use the `play_acquire`
@@ -205,9 +214,19 @@ Sign in with the static Dex user `host@example.com` / `password`
 (configured in `dev/dex/config.yaml`). To use real identity
 providers, add Dex connectors (GitHub, Google, etc.) there.
 
-Players don't need accounts. The host opens the lobby, clicks
-**Invite players** and shares the QR code or the 9-digit PIN.
-Invites expire after 15 minutes.
+Players don't need accounts. Creating a game opens its lobby, which
+works like a party-game screen. The QR code and the 9-digit PIN are
+always shown, and a fresh invite replaces each one before it expires
+(after 15 minutes).
+
+- The host has no seat at first. They can choose **Join on this
+  device** to play from the same screen, or leave it as the shared
+  board.
+- Before the start, every seated player can change their name and
+  mascot, or leave the game. Names must be unique.
+- **Start game** needs at least two seated players. When it starts,
+  every lobby moves on by itself: seated devices go to
+  `/game/:id/play` and the rest go to `/game/:id/watch`.
 
 ## Configuration
 
@@ -216,6 +235,7 @@ Invites expire after 15 minutes.
 | `PORT`               | `4000`                      |
 | `HOST`               | `0.0.0.0`                   |
 | `DATA_DIR`           | `data` (SQLite database)    |
+| `GAME_IDLE_MINUTES`  | `15` (delete idle games)    |
 | `PUBLIC_URL`         | `http://localhost:4200`     |
 | `ALLOWED_HOSTS`      | extra SSR hosts, comma-sep. |
 | `SESSION_SECRET`     | random per start (set it!)  |
@@ -248,9 +268,12 @@ or real players.
 
 - `npm run ui:check` (`tools/ui-check.mjs`) needs a build, so run
   `npm run build` first. It starts the built server on port 4318
-  with a throwaway database, seats the host and a bot, and plays the
-  host's turns in headless Chrome at phone size. It checks that the
-  action panel scrolls into view each turn, tiles can be placed from
+  with a throwaway database. It first checks the host lobby: the
+  invite shows without a click, and joining on this device,
+  renaming, leaving and starting to `/play` or `/watch` all work.
+  Then it seats the host and a bot and plays the host's turns in
+  headless Chrome at phone size. It checks that the action panel
+  scrolls into view each turn, tiles can be placed from
   the action panel, panels collapse and stay collapsed, and the hide
   navigation / hide board preferences work. Screenshots are saved to
   `/tmp/acquire-ui-check`. Set `CHROME_PATH` if Chrome isn't at
@@ -258,8 +281,9 @@ or real players.
   read.
 - `tools/seed.mjs`: helpers for other scripts. `seedGame()` creates a
   game with a forged host session cookie (it needs the server's
-  `SESSION_SECRET`) and seats guests through an invite;
-  `runBot()` seats a bot that plays simple legal moves over the
-  WebSocket; `startGame()` starts the game from the host's seat.
+  `SESSION_SECRET`), seats the host unless `seatHost: false`, and
+  seats guests through an invite. `runBot()` seats a bot that plays
+  simple legal moves over the WebSocket. `startGame(base, game)`
+  starts a game that `seedGame()` returned.
   Put the host's seat grant in localStorage as
   `acquire.seat.<gameId>` to open the game in a browser as the host.

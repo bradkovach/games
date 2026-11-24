@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import type {
+  HostStatus,
   InviteInfo,
   Me,
   SeatGrant,
@@ -15,14 +16,17 @@ export class Api {
   }
 
   createGame(settings: {
-    avatar?: string;
     mode: 'classic' | 'tycoon';
     secretHoldings: boolean;
-  }): Promise<SeatGrant> {
+  }): Promise<{ gameId: string }> {
     return request('/api/games', {
       body: JSON.stringify(settings),
       method: 'POST',
     });
+  }
+
+  hostStatus(gameId: string): Promise<HostStatus> {
+    return request(`${game(gameId)}/host`);
   }
 
   invite(gameId: string): Promise<InviteInfo> {
@@ -52,7 +56,26 @@ export class Api {
   me(): Promise<Me | null> {
     return request<Me>('/api/me').catch(() => null);
   }
+
+  /** Seats the signed-in host on this device. */
+  seatHost(
+    gameId: string,
+    name: string,
+    avatar?: string,
+  ): Promise<SeatGrant> {
+    return request(`${game(gameId)}/seat`, {
+      body: JSON.stringify({ avatar, name }),
+      method: 'POST',
+    });
+  }
+
+  async startGame(gameId: string): Promise<void> {
+    await request(`${game(gameId)}/start`, { method: 'POST' });
+  }
 }
+
+const game = (id: string) =>
+  `/api/games/${encodeURIComponent(id)}`;
 
 async function request<T>(
   url: string,

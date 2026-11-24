@@ -1,7 +1,9 @@
-// Headless-Chrome check of the player screen. Boots the built server
-// (npm run build first) on a throwaway data dir, seats the host and a
-// bot, plays the host's turns through the page on a phone viewport,
-// and asserts layout behaviour. Screenshots go to OUT_DIR.
+// Headless-Chrome check of the lobby and player screen. Boots the
+// built server (npm run build first) on a throwaway data dir, checks
+// the host lobby (invite, join on this device, rename, leave, start),
+// then seats the host and a bot, plays the host's turns through the
+// page on a phone viewport, and asserts layout behaviour.
+// Screenshots go to OUT_DIR.
 //
 //   node tools/ui-check.mjs
 //
@@ -18,7 +20,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 
-import { runBot, seedGame, sleep, startGame } from './seed.mjs';
+import {
+  connect,
+  runBot,
+  seedGame,
+  sleep,
+  startGame,
+} from './seed.mjs';
 
 const CHROME =
   process.env.CHROME_PATH ?? '/usr/bin/google-chrome';
@@ -65,19 +73,142 @@ async function bootServer() {
   };
 }
 
-async function main() {
-  mkdirSync(OUT, { recursive: true });
-  const { guests, host } = await seedGame({
+/** Opens a game's lobby as its signed-in host, with no seat. */
+async function hostLobby(browser, game) {
+  const context = await browser.newContext({
+    viewport: { height: 900, width: 1280 },
+  });
+  const [name, value] = game.cookie.split(/=(.*)/);
+  await context.addCookies([{ name, url: BASE, value }]);
+  const page = await context.newPage();
+  page.on('dialog', (dialog) => dialog.accept());
+  await page.goto(`${BASE}/game/${game.gameId}`);
+  await page.waitForSelector('.players');
+  return page;
+}
+
+const playerNames = (page) =>
+  page.$$eval('.players li', (items) =>
+    items.map((li) =>
+      li.textContent.replace(/\s+/g, ' ').trim(),
+    ),
+  );
+
+async function waitFor(predicate, timeout = 5000) {
+  const until = Date.now() + timeout;
+  while (Date.now() < until) {
+    if (await predicate()) return true;
+    await sleep(100);
+  }
+  return false;
+}
+
+async function checkLobby(browser) {
+  const game = await seedGame({
     base: BASE,
+    guests: ['Gus', 'Ivy'],
+    seatHost: false,
     secret: SECRET,
   });
-  // Slow enough that the host's screen is idle between turns.
-  const bot = await runBot(BASE, guests[0], { delayMs: 1500 });
-  await startGame(BASE, host);
+  const page = await hostLobby(browser, game);
+  await page.waitForSelector('.pin', { timeout: 5000 });
+  check(
+    /^\d{3}-\d{3}-\d{3}$/.test(await page.textContent('.pin')) &&
+      (await page.$('img.qr')) !== null,
+    'lobby shows the PIN and QR without a click',
+  );
+  await page.screenshot({ path: `${OUT}/lobby-host.png` });
 
+  await page.fill('.seat input[name=name]', 'Hana');
+  await page.click('.seat button[type=submit]');
+  check(
+    await waitFor(async () =>
+      (await playerNames(page)).some((n) =>
+        /Hana \(host\) \(you\)/.test(n),
+      ),
+    ),
+    'join on this device seats the host',
+  );
+
+  await page.fill('.you input[name=name]', 'Captain');
+  await page.click('.you button[type=submit]');
+  check(
+    await waitFor(async () =>
+      (await playerNames(page)).some((n) =>
+        n.includes('Captain'),
+      ),
+    ),
+    'renaming updates the player list',
+  );
+
+  await page.click('.you button.leave');
+  check(
+    await waitFor(
+      async () =>
+        (await page.$('.seat')) !== null &&
+        !(await playerNames(page)).some((n) =>
+          n.includes('Captain'),
+        ),
+    ),
+    'host can leave and is offered the seat again',
+  );
+
+  const gus = await connect(BASE, game.guests[0]);
+  await sleep(200);
+  gus.send({ type: 'leave' });
+  check(
+    await waitFor(
+      async () =>
+        !(await playerNames(page)).some((n) =>
+          n.includes('Gus'),
+        ),
+    ),
+    "a guest leaving updates the host's lobby",
+  );
+  gus.close();
+
+  await page.fill('.seat input[name=name]', 'Hana');
+  await page.click('.seat button[type=submit]');
+  await page.waitForSelector('.you');
+  await page.click('button.start');
+  check(
+    await waitFor(() => page.url().endsWith('/play')),
+    'seated host starts into the player screen',
+  );
+  await page.context().close();
+
+  const board = await seedGame({
+    base: BASE,
+    guests: ['Gus', 'Ivy'],
+    seatHost: false,
+    secret: SECRET,
+  });
+  const boardPage = await hostLobby(browser, board);
+  await boardPage.click('button.start');
+  check(
+    await waitFor(() => boardPage.url().endsWith('/watch')),
+    'unseated host starts into the board view',
+  );
+  await boardPage.waitForSelector('.frame');
+  await boardPage.context().close();
+}
+
+async function main() {
+  mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({
     executablePath: CHROME,
   });
+  await checkLobby(browser);
+
+  const game = await seedGame({
+    base: BASE,
+    secret: SECRET,
+  });
+  const { guests, host } = game;
+  // Slow enough that the host's screen is idle between turns.
+  const bot = await runBot(BASE, guests[0], { delayMs: 1500 });
+  await startGame(BASE, game);
+
   async function open(viewport, prefs = {}, path = '') {
     const context = await browser.newContext({ viewport });
     await context.addInitScript(
@@ -94,7 +225,9 @@ async function main() {
       ],
     );
     const page = await context.newPage();
-    await page.goto(`${BASE}${path || `/game/${host.gameId}`}`);
+    await page.goto(
+      `${BASE}${path || `/game/${host.gameId}/play`}`,
+    );
     if (!path) await page.waitForSelector('.frame');
     return page;
   }

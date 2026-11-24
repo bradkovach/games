@@ -145,5 +145,5 @@ function originAllowed(
 }
 
 function rpcError(code: number, message: string) {
-  return { id: null, error: { code, message }, jsonrpc: '2.0' };
+  return { error: { code, message }, id: null, jsonrpc: '2.0' };
 }

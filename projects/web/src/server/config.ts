@@ -4,6 +4,8 @@ export interface ServerConfig {
   /** Host names Angular SSR may render for (SSRF guard). */
   allowedHosts: string[];
   dataDir: string;
+  /** How long a game survives with nobody connected. */
+  gameIdleMs?: number;
   oidc: {
     clientId: string;
     clientSecret: string;
@@ -34,6 +36,7 @@ export function loadConfig(): ServerConfig {
       ...extraHosts,
     ],
     dataDir: env('DATA_DIR', 'data'),
+    gameIdleMs: minutes('GAME_IDLE_MINUTES', 15) * 60_000,
     oidc: {
       clientId: env('OIDC_CLIENT_ID', 'acquire'),
       clientSecret: env(
@@ -49,4 +52,9 @@ export function loadConfig(): ServerConfig {
 
 function env(name: string, fallback: string): string {
   return process.env[name]?.trim() || fallback;
+}
+
+function minutes(name: string, fallback: number): number {
+  const value = Number(process.env[name]?.trim() || fallback);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
 }

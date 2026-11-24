@@ -213,9 +213,9 @@ function endGame(out: Emitter) {
     chainSizes: chainSizes(state),
     mode: state.settings.mode,
     players: state.players.map((p) => ({
-      id: p.id,
       cash: state.cash[p.id],
       holdings: state.stock[p.id],
+      id: p.id,
     })),
   });
   for (const [chain, payouts] of Object.entries(

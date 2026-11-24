@@ -125,23 +125,35 @@ describe('MCP endpoint', () => {
     };
   }
 
+  const cookie = () =>
+    `acq_session=${app.signCookie(
+      JSON.stringify({ id: 'host-user', name: 'Host' }),
+    )}`;
+
   async function hostGame(): Promise<{
     grant: SeatGrant;
     invite: InviteInfo;
   }> {
-    const cookie = `acq_session=${app.signCookie(
-      JSON.stringify({ id: 'host-user', name: 'Host' }),
-    )}`;
-    const grant = (await (
-      await fetch(`${base}/api/games`, {
-        body: JSON.stringify({ secretHoldings: true }),
-        headers: { 'content-type': 'application/json', cookie },
-        method: 'POST',
-      })
-    ).json()) as SeatGrant;
+    const post = async (url: string, body: object) =>
+      (
+        await fetch(`${base}${url}`, {
+          body: JSON.stringify(body),
+          headers: {
+            'content-type': 'application/json',
+            cookie: cookie(),
+          },
+          method: 'POST',
+        })
+      ).json();
+    const { gameId } = (await post('/api/games', {
+      secretHoldings: true,
+    })) as { gameId: string };
+    const grant = (await post(`/api/games/${gameId}/seat`, {
+      name: 'Host',
+    })) as SeatGrant;
     const invite = (await (
       await fetch(`${base}/api/games/${grant.gameId}/invites`, {
-        headers: { cookie },
+        headers: { cookie: cookie() },
         method: 'POST',
       })
     ).json()) as InviteInfo;
@@ -208,7 +220,11 @@ describe('MCP endpoint', () => {
         seatToken: grant.seatToken,
       }),
     );
-    socket.send(JSON.stringify({ type: 'start', id: 'start' }));
+    const start = await fetch(
+      `${base}/api/games/${grant.gameId}/start`,
+      { headers: { cookie: cookie() }, method: 'POST' },
+    );
+    expect(start.status).toBe(200);
 
     const started = await call(north, 'wait_for_turn', {
       timeoutSeconds: 5,
@@ -245,8 +261,8 @@ describe('MCP endpoint', () => {
         socket.send(
           JSON.stringify({
             type: 'command',
-            id: `h${++hostCounter}`,
             command: { type: TOOL_COMMANDS[tool], ...args },
+            id: `h${++hostCounter}`,
           }),
         );
         await vi.waitFor(() =>

@@ -70,6 +70,56 @@ describe('HTTP API', () => {
     expect(malformed.statusCode).toBe(400);
   });
 
+  it('lets only the host seat themselves and start', async () => {
+    await app.ready();
+    const as = (id: string) => ({
+      cookie: `acq_session=${app.signCookie(
+        JSON.stringify({ id, name: id }),
+      )}`,
+    });
+    const { gameId } = (
+      await app.inject({
+        body: { mode: 'classic' },
+        headers: as('owner'),
+        method: 'POST',
+        url: '/api/games',
+      })
+    ).json() as { gameId: string };
+
+    const status = (who?: string) =>
+      app.inject({
+        headers: who ? as(who) : {},
+        url: `/api/games/${gameId}/host`,
+      });
+    expect((await status('owner')).json()).toEqual({
+      isHost: true,
+    });
+    expect((await status()).json()).toEqual({ isHost: false });
+
+    const seat = (who: string) =>
+      app.inject({
+        body: { name: 'Owner' },
+        headers: as(who),
+        method: 'POST',
+        url: `/api/games/${gameId}/seat`,
+      });
+    expect((await seat('intruder')).statusCode).toBe(403);
+    const grant = await seat('owner');
+    expect(grant.statusCode).toBe(200);
+    expect(grant.json()).toMatchObject({ gameId });
+    expect((await seat('owner')).statusCode).toBe(409);
+
+    const start = (who: string) =>
+      app.inject({
+        headers: as(who),
+        method: 'POST',
+        url: `/api/games/${gameId}/start`,
+      });
+    expect((await start('intruder')).statusCode).toBe(403);
+    const alone = await start('owner');
+    expect(alone.statusCode).toBe(409);
+  });
+
   it('closes sockets for unknown games', async () => {
     await app.ready();
     const socket = await app.injectWS('/ws/missing');

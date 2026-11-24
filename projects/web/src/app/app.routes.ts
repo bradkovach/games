@@ -23,15 +23,23 @@ export const routes: Routes = [
     data: { frame: true },
     loadComponent: () =>
       import('./pages/spectator').then((m) => m.SpectatorPage),
-    path: 'game/:id/board',
+    path: 'game/:id/watch',
     title: 'Board · Acquire',
   },
+  // Links shared before the board moved to /watch.
+  { path: 'game/:id/board', redirectTo: 'game/:id/watch' },
   {
     data: { frame: true },
     loadComponent: () =>
       import('./pages/game').then((m) => m.GamePage),
-    path: 'game/:id',
+    path: 'game/:id/play',
     title: 'Game · Acquire',
+  },
+  {
+    loadComponent: () =>
+      import('./pages/lobby').then((m) => m.LobbyPage),
+    path: 'game/:id',
+    title: 'Lobby · Acquire',
   },
   { path: '**', redirectTo: '' },
 ];

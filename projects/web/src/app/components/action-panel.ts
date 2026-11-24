@@ -119,6 +119,26 @@ export const AUTO_END_DELAY_MS = 1500;
     .dispose .actions {
       min-width: 7rem;
     }
+    .prices {
+      align-items: baseline;
+      display: grid;
+      gap: 0.25rem 0.6rem;
+      grid-template-columns: auto 1fr;
+      margin: 0.5rem 0;
+    }
+    .prices dd {
+      margin: 0;
+    }
+    .net {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .gain {
+      color: var(--up);
+    }
+    .loss {
+      color: var(--down);
+    }
 
     tfoot td,
     tfoot th {
@@ -241,18 +261,43 @@ export const AUTO_END_DELAY_MS = 1500;
               {{ names[d.survivor] }}
             </h3>
             <p>
-              You hold {{ d.owned }} shares (\${{
-                d.price
-              }}
-              each). Trades are 2 {{ names[d.acquired] }} → 1
-              {{ names[d.survivor] }}.
+              You hold {{ d.owned }}
+              {{ names[d.acquired] }} shares.
             </p>
+            <dl class="prices">
+              <dt>
+                <span class="chain chain-{{ d.acquired }}">{{
+                  names[d.acquired]
+                }}</span>
+              </dt>
+              <dd>
+                \${{ d.price | number: '1.0-0' }}/share; selling
+                2 pays \${{ d.price * 2 | number: '1.0-0' }}
+              </dd>
+              <dt>
+                <span class="chain chain-{{ d.survivor }}">{{
+                  names[d.survivor]
+                }}</span>
+              </dt>
+              <dd>
+                \${{ d.survivorPrice | number: '1.0-0' }}/share;
+                2-for-1 trade
+                <span
+                  [class.gain]="d.tradeEdge > 0"
+                  [class.loss]="d.tradeEdge < 0"
+                  >{{ d.tradeEdge >= 0 ? '+' : '−' }}\${{
+                    abs(d.tradeEdge) | number: '1.0-0'
+                  }}</span
+                >
+                vs. selling
+              </dd>
+            </dl>
             <table class="dispose">
               <thead>
                 <tr>
                   <th></th>
                   <th class="figure">Shares</th>
-                  <th class="num">You get</th>
+                  <th class="num">Value</th>
                 </tr>
               </thead>
               <tbody>
@@ -320,6 +365,10 @@ export const AUTO_END_DELAY_MS = 1500;
                     <span class="chain chain-{{ d.survivor }}">{{
                       names[d.survivor]
                     }}</span>
+                    <br />
+                    \${{
+                      disposeValue().traded | number: '1.0-0'
+                    }}
                   </td>
                 </tr>
                 <tr>
@@ -331,6 +380,22 @@ export const AUTO_END_DELAY_MS = 1500;
                 </tr>
               </tbody>
             </table>
+            <p class="net">
+              Net change vs. holding:
+              <app-ticker
+                format="currency"
+                signed
+                [class.gain]="disposeValue().net > 0"
+                [class.loss]="disposeValue().net < 0"
+                [value]="disposeValue().net"
+              />
+            </p>
+            <p class="muted">
+              Cash +\${{ disposeValue().cash | number: '1.0-0' }}
+              now. Values use today's prices;
+              {{ names[d.survivor] }} usually rises once the
+              merger grows it.
+            </p>
             <p>
               <button
                 type="button"
@@ -516,13 +581,14 @@ export class ActionPanelComponent {
     ),
   );
 
+  protected readonly abs = Math.abs;
+
   protected readonly client = inject(GameClient);
 
   protected readonly view = computed(() => {
     const view = this.client.view();
     return view && 'me' in view ? (view as PlayerView) : null;
   });
-
   protected readonly hasPlayable = computed(() =>
     (this.view()?.me.hand ?? []).some(
       (t) => t.status === 'playable',
@@ -585,6 +651,7 @@ export class ActionPanelComponent {
       .filter((c) => !c.active)
       .map((c) => c.chain),
   );
+
   protected readonly canDeclare = computed(() => {
     const view = this.view();
     return !!view && view.canDeclareEnd && !view.endDeclared;
@@ -605,7 +672,6 @@ export class ActionPanelComponent {
       0,
     );
   });
-
   /**
    * Identifies the decision being made. Every server message builds
    * a new phase object, so the inputs reset on this string instead.
@@ -623,17 +689,20 @@ export class ActionPanelComponent {
     const view = this.view();
     if (!view || phase?.kind !== 'disposeStock') return null;
     const owned = view.me.stock[phase.acquired];
-    const bank =
-      view.chains.find((c) => c.chain === phase.survivor)
-        ?.bank ?? 0;
+    const chainOf = (chain: string) =>
+      view.chains.find((c) => c.chain === chain);
+    const bank = chainOf(phase.survivor)?.bank ?? 0;
+    const price = chainOf(phase.acquired)?.price ?? 0;
+    const survivorPrice = chainOf(phase.survivor)?.price ?? 0;
     return {
       acquired: phase.acquired,
       maxTrade: Math.min(owned - (owned % 2), bank * 2),
       owned,
-      price:
-        view.chains.find((c) => c.chain === phase.acquired)
-          ?.price ?? 0,
+      price,
       survivor: phase.survivor,
+      survivorPrice,
+      /** What one 2-for-1 trade gains over selling both shares. */
+      tradeEdge: survivorPrice - price * 2,
     };
   });
   protected readonly sell = signal(0);
@@ -651,6 +720,23 @@ export class ActionPanelComponent {
       trade <= d.maxTrade &&
       sell + trade <= d.owned
     );
+  });
+  /**
+   * The configured disposal in dollars: cash from sales, the value
+   * of the survivor shares received, and the net change compared
+   * with holding the same shares at today's price.
+   */
+  protected readonly disposeValue = computed(() => {
+    const d = this.dispose();
+    const sell = this.sell();
+    const trade = this.trade();
+    if (!d) return { cash: 0, net: 0, traded: 0 };
+    const traded = (trade / 2) * d.survivorPrice;
+    return {
+      cash: sell * d.price,
+      net: traded - trade * d.price,
+      traded,
+    };
   });
   /** Whether any active chain has shares left in the bank. */
   protected readonly forSale = computed(

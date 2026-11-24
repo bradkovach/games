@@ -7,6 +7,8 @@ describe('formatTicker', () => {
     expect(formatTicker(12345, 'number')).toBe('12,345');
     expect(formatTicker(6000, 'currency')).toBe('$6,000');
     expect(formatTicker(-300, 'currency')).toBe('−$300');
+    expect(formatTicker(300, 'currency', true)).toBe('+$300');
+    expect(formatTicker(0, 'currency', true)).toBe('$0');
   });
 });
 

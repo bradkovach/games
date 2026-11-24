@@ -10,11 +10,11 @@ const sample: ScoreboardState = {
   chainSizes: { sackson: 5, tower: 12 },
   mode: 'classic',
   players: [
-    { id: 'a', cash: 1000, holdings: { tower: 5 }, name: 'A' },
+    { cash: 1000, holdings: { tower: 5 }, id: 'a', name: 'A' },
     {
-      id: 'b',
       cash: 2000,
       holdings: { sackson: 3, tower: 2 },
+      id: 'b',
       name: 'B',
     },
   ],
@@ -38,11 +38,11 @@ describe('scoreboard model', () => {
       ...sample,
       chainSizes: { tower: 12 },
       players: [
-        { id: 'a', cash: 0, holdings: { tower: 20 }, name: 'A' },
+        { cash: 0, holdings: { tower: 20 }, id: 'a', name: 'A' },
         {
-          id: 'b',
           cash: 0,
           holdings: { sackson: 1, tower: 6 },
+          id: 'b',
           name: 'B',
         },
       ],
