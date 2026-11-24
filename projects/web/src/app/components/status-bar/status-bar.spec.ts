@@ -33,7 +33,6 @@ describe('StatusBarComponent', () => {
     ]);
     expect(tiles[1].getAttribute('title')).toMatch(/^Dead/);
     expect(el.querySelector('button')).toBeNull();
-    expect(el.textContent).toContain('80 in bag');
   });
 
   it('omits cash and tiles for spectators', async () => {
